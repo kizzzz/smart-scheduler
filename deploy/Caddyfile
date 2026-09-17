@@ -67,3 +67,9 @@
 http://{$SERVER_IP:127.0.0.1} {
 	import app
 }
+
+# 容器内自检用。镜像里的 HEALTHCHECK 请求 http://localhost/，
+# 若没有这一块，Host: localhost 匹配不上任何站点 → 404 → 容器被判 unhealthy。
+http://localhost {
+	import app
+}
