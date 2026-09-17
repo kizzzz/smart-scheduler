@@ -1,6 +1,11 @@
 # ---------- 构建阶段 ----------
-FROM node:22-alpine AS build
+# 用 slim（glibc）而不是 alpine（musl）：alpine 上 npm ci 会稳定复现
+# "Exit handler never called!"（npm 在 musl 下的已知缺陷），已在目标机实测。
+FROM node:22-slim AS build
 WORKDIR /app
+ENV NPM_CONFIG_UPDATE_NOTIFIER=false \
+    NPM_CONFIG_FUND=false \
+    NPM_CONFIG_AUDIT=false
 
 # 依赖层：仅在 package.json / lock 变化时失效
 COPY package.json package-lock.json* ./

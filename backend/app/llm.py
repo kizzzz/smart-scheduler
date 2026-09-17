@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 
-from .data import DAYS, EMPLOYEE_IDS, EMPLOYEES, RULES, SHIFTS
+from .data import DAYS, EMPLOYEE_IDS, EMPLOYEES, MIN_PER_SHIFT_WEEKDAY, RULES, SHIFTS, min_required
 from .models import (
     Diagnosis,
     Schedule,
@@ -126,16 +126,47 @@ def _extract_json(text: str) -> Optional[dict]:
 _VALID_DAYS = set(DAYS)
 _VALID_SHIFTS = set(SHIFTS)
 
+_EMP_MENTION_RE = re.compile(r"[EeＥｅ]\s*[0-9０-９]{1,2}")
+_FULLWIDTH_DIGITS = str.maketrans("０１２３４５６７８９", "0123456789")
+
+
+def mentioned_employee_ids(text: str) -> set[str]:
+    """从原始指令里抽出**真的被提到过**的员工 ID。
+
+    用途是反幻觉：模型偶发会凭空补出用户没提的人（实测 glm-4-flash 会给
+    「E05 周六请假」顺带编一条「E01 固定在周六早班」）。这类约束会悄悄改变
+    排班结果，且店长很难发现，所以必须在进求解器之前丢掉。
+
+    容错写法：E01 / e1 / Ｅ０１ 都能识别，统一归一到 E0X。
+    """
+    found: set[str] = set()
+    for m in _EMP_MENTION_RE.findall(text or ""):
+        digits = m.translate(_FULLWIDTH_DIGITS)
+        digits = re.sub(r"[^0-9]", "", digits)
+        if not digits:
+            continue
+        eid = f"E{int(digits):02d}"
+        if eid in EMPLOYEE_IDS:
+            found.add(eid)
+    return found
+
 
 def _sanitize(raw: dict, text: str, source: str) -> ScheduleRequest:
     """对模型输出做确定性清洗：非法员工/日期/班次一律丢弃并转为澄清项。"""
     problems: List[str] = []
+    dropped: List[str] = []
+    mentioned = mentioned_employee_ids(text)
 
     def ok_emp(eid: Any) -> bool:
-        if isinstance(eid, str) and eid in EMPLOYEE_IDS:
-            return True
-        problems.append(f"指令中的「{eid}」无法对应到员工数据中的任何 ID，请确认具体是谁")
-        return False
+        if not (isinstance(eid, str) and eid in EMPLOYEE_IDS):
+            problems.append(f"指令中的「{eid}」无法对应到员工数据中的任何 ID，请确认具体是谁")
+            return False
+        # 反幻觉：ID 合法但原文根本没提这个人，视为模型编造，静默丢弃。
+        # 不转成澄清问题——就指令里不存在的人反问店长只会造成困惑。
+        if eid not in mentioned:
+            dropped.append(eid)
+            return False
+        return True
 
     def ok_day(d: Any) -> bool:
         return isinstance(d, str) and d in _VALID_DAYS
@@ -167,7 +198,11 @@ def _sanitize(raw: dict, text: str, source: str) -> ScheduleRequest:
             sh = f.get("shift") if f.get("shift") in _VALID_SHIFTS else None
             forbids.append({"employee_id": f["employee_id"], "day": f["day"], "shift": sh})
 
-    excludes = [e for e in (raw.get("exclude_employees") or []) if isinstance(e, str) and e in EMPLOYEE_IDS]
+    excludes = [
+        e
+        for e in (raw.get("exclude_employees") or [])
+        if isinstance(e, str) and e in EMPLOYEE_IDS and e in mentioned
+    ]
 
     prefs = []
     for sp in raw.get("soft_preferences") or []:
@@ -182,14 +217,30 @@ def _sanitize(raw: dict, text: str, source: str) -> ScheduleRequest:
             iv = int(v)
         except Exception:
             continue
-        if iv > 0 and (k in _VALID_DAYS or k == "all" or ("|" in k and k.split("|")[0] in _VALID_DAYS)):
-            overrides[k] = iv
+        if iv <= 0:
+            continue
+        if not (k in _VALID_DAYS or k == "all" or ("|" in k and k.split("|")[0] in _VALID_DAYS)):
+            continue
+        # 只保留「真的抬高了下限」的 override。
+        # 模型常把「周末早班多留一个收银」这类**技能位**诉求错译成 headcount=1，
+        # 而 R-04 本身就要求工作日 ≥4、周末 ≥6，这种值是纯 no-op，
+        # 留着只会在前端 chip 上显示成误导性的「周六 早班 ≥ 1 人」。
+        day_of = k.split("|")[0] if "|" in k else k
+        baseline = MIN_PER_SHIFT_WEEKDAY if day_of == "all" else min_required(day_of)
+        if iv <= baseline:
+            dropped.append(f"min_staff_override:{k}={iv}")
+            continue
+        overrides[k] = iv
 
     clar = [c for c in (raw.get("clarification_needed") or []) if isinstance(c, str) and c.strip()]
     clar.extend(problems)
     action = raw.get("action") if raw.get("action") in {"generate", "adjust", "unknown"} else "generate"
     if clar:
         action = "unknown"
+
+    notes = [n for n in (raw.get("notes") or []) if isinstance(n, str)][:4]
+    if dropped:
+        notes.append("已丢弃模型凭空补充的约束：" + "、".join(dict.fromkeys(dropped)))
 
     return ScheduleRequest(
         action=action,  # type: ignore[arg-type]
@@ -199,7 +250,7 @@ def _sanitize(raw: dict, text: str, source: str) -> ScheduleRequest:
         exclude_employees=excludes,
         soft_preferences=prefs,  # type: ignore[arg-type]
         min_staff_override=overrides,
-        notes=[n for n in (raw.get("notes") or []) if isinstance(n, str)][:4],
+        notes=notes,
         clarification_needed=list(dict.fromkeys(clar))[:4],
         raw_text=text,
         parse_source=source,  # type: ignore[arg-type]

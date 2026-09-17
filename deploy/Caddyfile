@@ -19,8 +19,16 @@
 	# 后端 API：同域 /api 前缀，前端全部使用相对路径，无需 CORS
 	handle /api/* {
 		reverse_proxy api:8000 {
+			# 主动健康检查间隔要短：容器冷启动时 api 会晚几秒才 listen，
+			# 若间隔 30s，第一次探测失败后会有长达 30s 的 503 空窗（已实测踩到）。
 			health_uri /api/health
-			health_interval 30s
+			health_interval 5s
+			health_timeout 3s
+
+			# 单个请求内重试，进一步吃掉冷启动窗口
+			lb_try_duration 5s
+			lb_try_interval 250ms
+
 			transport http {
 				read_timeout 60s
 			}
