@@ -46,7 +46,13 @@ export function IntentCard({
         <Wand2 size={13} className="flex-none text-teal-700" />
         <h3 className="text-[13px] font-semibold text-ink">已理解为</h3>
         <div className="ml-auto flex items-center gap-2">
-          <Badge tone="teal">{intent.operation === 'adjust' ? '操作：最小扰动重排' : '操作：全新生成'}</Badge>
+          <Badge tone={intent.operation === 'unknown' ? 'pend' : 'teal'}>
+            {intent.operation === 'adjust'
+              ? '操作：最小扰动重排'
+              : intent.operation === 'unknown'
+                ? '操作：待澄清'
+                : '操作：全新生成'}
+          </Badge>
           {intent.degraded ? <Badge tone="pend">结构化降级解析</Badge> : <Badge tone="pass">LLM 解析成功</Badge>}
         </div>
       </div>

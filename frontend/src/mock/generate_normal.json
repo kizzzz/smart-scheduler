@@ -314,6 +314,7 @@
     "degraded": false
   },
   "infeasible": null,
+  "clarification": null,
   "diff": null,
   "timing": {
     "parse_ms": 820,

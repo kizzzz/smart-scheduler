@@ -322,6 +322,7 @@
     "degraded": false
   },
   "infeasible": null,
+  "clarification": null,
   "diff": {
     "changed_count": 2,
     "changed_slots": [

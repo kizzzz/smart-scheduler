@@ -66,7 +66,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     });
   } catch (e) {
     throw new ApiError(
-      '无法连接后端服务，请确认 FastAPI 已在 http://localhost:8000 启动。',
+      '无法连接后端服务，请确认 FastAPI 已在 http://127.0.0.1:8000 启动。',
       undefined,
       e instanceof Error ? e.message : String(e),
     );

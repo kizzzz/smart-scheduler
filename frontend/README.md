@@ -7,7 +7,8 @@ React 19 + TypeScript + Vite + Tailwind CSS v3 实现的连锁门店 AI 排班�
 
 ```bash
 npm install
-npm run dev     # http://localhost:5173，/api 已代理到 http://localhost:8000
+npm run dev     # http://localhost:5173，/api 已代理到 http://127.0.0.1:8000
+                # 换后端地址：VITE_API_TARGET=http://127.0.0.1:9000 npm run dev
 npm run build   # tsc --noEmit && vite build → dist/
 npx vite preview --port 4173
 ```
@@ -22,7 +23,8 @@ URL 加 `?mock=1` 走 `src/mock/` 下符合 API 契约的样例数据，可选 `
 | --- | --- |
 | `?mock=1&case=normal` | 正常态（9/9 通过） |
 | `?mock=1&case=violation` | 违规态（R-07 + 意图解析降级） |
-| `?mock=1&case=infeasible` | 无解态（`proven: true` + 三条解锁路径） |
+| `?mock=1&case=infeasible` | 无解态（`proven: true` + 三条解锁路径，9 条规则灰态「待排班」） |
+| `?mock=1&case=clarify` | 澄清态（`mode: "clarify"`，反问 + 改写建议，不产出排班） |
 | `?mock=1&case=adjust` | 最小扰动重排（diff 提示条） |
 | `?mock=1&case=error` | 错误态（HTTP 500 可重试卡片） |
 
@@ -33,7 +35,7 @@ mock 模式下换人 / 应用修复建议会走 `src/mock/validator.ts`（9 条�
 
 ```
 src/
-├── App.tsx                  # 状态编排：空/加载/正常/违规/无解/错误
+├── App.tsx                  # 状态编排：空/加载/正常/违规/澄清/无解/错误
 ├── api.ts                   # fetch 封装 + mock 开关 + ApiError
 ├── types.ts                 # API 契约类型（字段名与后端严格一致）
 ├── lib/{utils,schedule}.ts  # 工具 / 候选人筛选、slot 变更、违规索引
@@ -51,6 +53,21 @@ docker run -p 8080:80 smart-scheduler-frontend
 
 多阶段构建：`node:22-alpine` 构建 → `caddy:2-alpine` 托管 `dist`，监听 80，
 `try_files {path} /index.html` 做 SPA fallback，`/assets/*` 长缓存、`index.html` 不缓存。
+
+## 后端四种响应，前端四种界面
+
+| `mode` / 字段 | 界面 |
+| --- | --- |
+| `generate` + `validation.passed` | 排班看板 + `9/9 通过` 绿态 |
+| `generate` / `adjust` + `violation_count > 0` | 违规行展开 + 可执行修复建议按钮（`remove`/`add` 同属一个 `day|shift`，点一下改本地表并重新校验） |
+| `adjust` + `diff` | 顶部 diff 提示条（只列改动的班次与人） |
+| `clarify` + `clarification` | 澄清卡（反问 + 原话回显 + 改写建议），**不渲染排班表、不渲染无解卡** |
+| `infeasible.proven` | 无解诊断卡（最小冲突集 + 解锁路径） |
+
+澄清态与无解态后端返回的是 `empty_validation()`（9 条规则 `passed: false` 且 `violations: []`），
+前端按「待排班」灰态渲染，绝不显示成红色违规。软指标同时置灰、进度条清零。
+
+`skill_redundancy` 后端已归一化到 0–1（`min(1, 平均每班冗余人次 / 8)`），前端直接按百分比展示，不再二次换算。
 
 ## 有意的范围收敛
 

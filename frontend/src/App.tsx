@@ -32,6 +32,7 @@ import { ScheduleBoard } from './components/ScheduleBoard';
 import { ValidationPanel } from './components/ValidationPanel';
 import { ExplanationCard } from './components/ExplanationCard';
 import { InfeasibleCard } from './components/InfeasibleCard';
+import { ClarifyCard } from './components/ClarifyCard';
 import { EmptyBoard } from './components/EmptyBoard';
 import { BoardSkeleton } from './components/BoardSkeleton';
 import { ErrorCard } from './components/ErrorCard';
@@ -234,7 +235,10 @@ export default function App() {
 
   const issues = useMemo(() => buildIssueIndex(validation), [validation]);
   const hasSchedule = Boolean(slots?.length);
-  const infeasible = result?.infeasible ?? null;
+  // 澄清态优先：后端 mode=clarify 时不产出排班，也不产出无解诊断
+  const clarification =
+    result && (result.mode === 'clarify' || result.clarification) ? result.clarification : null;
+  const infeasible = clarification ? null : (result?.infeasible ?? null);
 
   const onScenario = (s: Scenario) => {
     setInstruction(s.instruction);
@@ -293,11 +297,44 @@ export default function App() {
 
         {loading ? (
           <BoardSkeleton phase={phase} />
+        ) : clarification ? (
+          <>
+            <ClarifyCard
+              clarification={clarification}
+              lead={result?.explanation?.bullets?.[0]}
+              onUseRewrite={(text) => {
+                setInstruction(text);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+            />
+            {meta ? (
+              <ValidationPanel
+                meta={meta}
+                validation={null}
+                softMetrics={null}
+                validating={false}
+                pending
+                pendingHint="澄清态不产出排班，硬规则等指令明确后再校验"
+                onApplySuggestion={applySuggestion}
+              />
+            ) : null}
+          </>
         ) : infeasible ? (
           <>
             <InfeasibleCard infeasible={infeasible} />
             {result?.explanation ? (
               <ExplanationCard explanation={result.explanation} timing={result.timing} />
+            ) : null}
+            {meta ? (
+              <ValidationPanel
+                meta={meta}
+                validation={null}
+                softMetrics={null}
+                validating={false}
+                pending
+                pendingHint="本次无可行解，没有排班可校验；请先按上方解锁路径放宽条件"
+                onApplySuggestion={applySuggestion}
+              />
             ) : null}
           </>
         ) : hasSchedule && meta && slots ? (

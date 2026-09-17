@@ -1,5 +1,5 @@
 {
-  "ok": true,
+  "ok": false,
   "mode": "generate",
   "intent": {
     "operation": "generate",
@@ -346,6 +346,7 @@
     "degraded": false
   },
   "infeasible": null,
+  "clarification": null,
   "diff": null,
   "timing": {
     "parse_ms": 60,

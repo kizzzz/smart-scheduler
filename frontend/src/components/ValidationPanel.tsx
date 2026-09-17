@@ -3,6 +3,7 @@ import {
   CheckCircle2,
   ChevronDown,
   CircleAlert,
+  Clock3,
   Loader2,
   ShieldCheck,
   Wrench,
@@ -18,12 +19,17 @@ export function ValidationPanel({
   validation,
   softMetrics,
   validating,
+  pending = false,
+  pendingHint,
   onApplySuggestion,
 }: {
   meta: Meta;
   validation: Validation | null;
   softMetrics: SoftMetrics | null;
   validating: boolean;
+  /** 没有排班可校验（澄清态 / 无解态）：全部规则显示为灰色「待排班」，不显示红色违规 */
+  pending?: boolean;
+  pendingHint?: string;
   onApplySuggestion: (s: Suggestion) => void;
 }) {
   const byId = new Map((validation?.rules ?? []).map((r) => [r.id, r]));
@@ -39,10 +45,18 @@ export function ValidationPanel({
     <Card>
       <CardHeader
         icon={<ShieldCheck size={15} />}
-        title={`规则校验 · ${passedCount}/${total} 通过`}
-        subtitle="校验器独立于求解器，任何来源的排班都过同一套硬规则"
+        title={pending ? `规则校验 · 待排班（共 ${total} 条硬规则）` : `规则校验 · ${passedCount}/${total} 通过`}
+        subtitle={
+          pending
+            ? pendingHint ?? '本次没有产出排班，硬规则尚未参与校验'
+            : '校验器独立于求解器，任何来源的排班都过同一套硬规则'
+        }
         right={
-          validating ? (
+          pending ? (
+            <Badge tone="neutral" icon={<Clock3 size={10} />}>
+              待排班
+            </Badge>
+          ) : validating ? (
             <Badge tone="teal" icon={<Loader2 size={10} className="animate-spin" />}>
               校验中
             </Badge>
@@ -60,7 +74,7 @@ export function ValidationPanel({
       <CardBody>
         <div className="grid gap-x-5 gap-y-0.5 md:grid-cols-2">
           {rows.map((r) => (
-            <RuleRow key={r.id} rule={r} onApplySuggestion={onApplySuggestion} />
+            <RuleRow key={r.id} rule={r} pending={pending} onApplySuggestion={onApplySuggestion} />
           ))}
         </div>
 
@@ -73,40 +87,59 @@ export function ValidationPanel({
             value={softMetrics?.preference_rate ?? 0}
             display={softMetrics ? pct(softMetrics.preference_rate) : '—'}
             hint="被排班次与员工班次偏好一致的比例"
+            muted={pending}
           />
           <MetricBar
             label="工时均衡度"
             value={softMetrics?.balance_score ?? 0}
             display={softMetrics ? softMetrics.balance_score.toFixed(2) : '—'}
             hint="0–1，越高说明人均班次越平均"
+            muted={pending}
           />
           <MetricBar
             label="技能冗余度"
-            value={Math.min(1, (softMetrics?.skill_redundancy ?? 0) / 2)}
-            display={softMetrics ? `${softMetrics.skill_redundancy.toFixed(1)}×` : '—'}
-            hint="关键技能相对最低要求的倍数，越高越抗突发请假"
+            value={softMetrics?.skill_redundancy ?? 0}
+            display={softMetrics ? pct(softMetrics.skill_redundancy) : '—'}
+            hint="平均每班的技能冗余人数，按每班 8 人次冗余记满分"
+            muted={pending}
           />
         </div>
         <p className="mt-2.5 text-[11px] text-mut-2">
-          软约束不阻塞生成，仅用于方案排序与向店长解释权衡。
+          {pending
+            ? '软约束数值随排班方案产出，当前无方案可计算。'
+            : '软约束不阻塞生成，仅用于方案排序与向店长解释权衡。'}
         </p>
       </CardBody>
     </Card>
   );
 }
 
+/** 违规定位：周工时这类跨班次规则后端不给 day/shift，此时不能渲染成「周 」 */
+function violationScope(day: string, shift: string): string {
+  if (day && shift) return `周${day} ${shift}`;
+  if (day) return `周${day} 全天`;
+  return '本周整体';
+}
+
 function RuleRow({
   rule,
+  pending,
   onApplySuggestion,
 }: {
   rule: RuleResult;
+  pending: boolean;
   onApplySuggestion: (s: Suggestion) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const failed = !rule.passed;
+  const failed = !pending && !rule.passed;
 
   return (
-    <div className={cn('border-b border-dashed border-line-2 py-1', failed && 'border-solid border-fail-border')}>
+    <div
+      className={cn(
+        'border-b border-dashed border-line-2 py-1',
+        failed && 'border-solid border-fail-border',
+      )}
+    >
       <button
         type="button"
         onClick={() => failed && setOpen((v) => !v)}
@@ -118,12 +151,21 @@ function RuleRow({
         <code
           className={cn(
             'flex-none rounded px-1 font-mono text-[10.5px] font-semibold leading-[18px]',
-            failed ? 'bg-fail-bg text-fail' : 'bg-teal-50 text-teal-800',
+            failed
+              ? 'bg-fail-bg text-fail'
+              : pending
+                ? 'bg-[#F1F5F4] text-mut'
+                : 'bg-teal-50 text-teal-800',
           )}
         >
           {rule.id}
         </code>
-        <span className={cn('min-w-0 flex-1 text-[12px] leading-snug', failed ? 'text-fail-deep' : 'text-ink-2')}>
+        <span
+          className={cn(
+            'min-w-0 flex-1 text-[12px] leading-snug',
+            failed ? 'text-fail-deep' : pending ? 'text-mut' : 'text-ink-2',
+          )}
+        >
           {rule.text}
           {failed ? (
             <span className="ml-1.5 rounded bg-fail-bg px-1 text-[10px] font-semibold text-fail">
@@ -134,8 +176,13 @@ function RuleRow({
         {failed ? (
           <ChevronDown
             size={13}
-            className={cn('mt-[3px] flex-none text-fail transition-transform duration-150', open && 'rotate-180')}
+            className={cn(
+              'mt-[3px] flex-none text-fail transition-transform duration-150',
+              open && 'rotate-180',
+            )}
           />
+        ) : pending ? (
+          <span className="mt-[2px] flex-none text-[10px] font-semibold text-mut-2">待排班</span>
         ) : (
           <CheckCircle2 size={13} className="mt-[3px] flex-none text-pass" />
         )}
@@ -148,9 +195,7 @@ function RuleRow({
               <p className="flex items-start gap-1.5 text-[11.5px] leading-relaxed text-fail-deep">
                 <CircleAlert size={12} className="mt-[2px] flex-none text-fail" />
                 <span>
-                  <b className="font-semibold">
-                    周{v.day} {v.shift}
-                  </b>
+                  <b className="font-semibold">{violationScope(v.day, v.shift)}</b>
                   {v.employees.length ? `（${v.employees.join('、')}）` : ''}：{v.message}
                 </span>
               </p>
@@ -169,7 +214,9 @@ function RuleRow({
                   ))}
                 </div>
               ) : (
-                <p className="pl-4 text-[11px] text-mut">后端未提供自动修复建议，请手工点击 chip 调整。</p>
+                <p className="pl-4 text-[11px] text-mut">
+                  后端未提供自动修复建议，请手工点击 chip 调整。
+                </p>
               )}
             </div>
           ))}

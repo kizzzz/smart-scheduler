@@ -5,6 +5,7 @@ import normalJson from './generate_normal.json';
 import violationJson from './generate_violation.json';
 import adjustJson from './generate_adjust.json';
 import infeasibleJson from './generate_infeasible.json';
+import clarifyJson from './generate_clarify.json';
 
 export const mockMeta = metaJson as unknown as Meta;
 export const mockScenarios = scenariosJson as unknown as Scenario[];
@@ -12,13 +13,15 @@ export const mockNormal = normalJson as unknown as GenerateResponse;
 export const mockViolation = violationJson as unknown as GenerateResponse;
 export const mockAdjust = adjustJson as unknown as GenerateResponse;
 export const mockInfeasible = infeasibleJson as unknown as GenerateResponse;
+export const mockClarify = clarifyJson as unknown as GenerateResponse;
 
-export type MockCase = 'normal' | 'violation' | 'infeasible' | 'adjust' | 'error';
+export type MockCase = 'normal' | 'violation' | 'infeasible' | 'adjust' | 'clarify' | 'error';
 
 export const MOCK_CASES: Array<{ value: MockCase; label: string }> = [
   { value: 'normal', label: '正常态' },
   { value: 'violation', label: '违规态 (R-07)' },
   { value: 'infeasible', label: '无解态 (proven)' },
+  { value: 'clarify', label: '澄清态 (clarify)' },
   { value: 'adjust', label: '重排 diff' },
   { value: 'error', label: '错误态 (5xx)' },
 ];
@@ -30,8 +33,10 @@ export function resolveMockCase(
   override?: MockCase | null,
 ): MockCase {
   if (override) return override;
-  if (baseSlots) return 'adjust';
   const text = instruction ?? '';
+  // 澄清判定优先于 base_slots：指令本身说不清时，后端不会走求解
+  if (/小王|小李|某人|明天|后天|那个人|尽快|随便/.test(text)) return 'clarify';
+  if (baseSlots) return 'adjust';
   if (/无解|冲突|培训|都请假|值守不足/.test(text)) return 'infeasible';
   if (/早班.*(想|希望)|违规|R-?07|间隔/.test(text)) return 'violation';
   if (/重排|最小扰动|临时请假/.test(text)) return 'adjust';
@@ -53,10 +58,15 @@ export function mockGenerate(
       ? mockViolation
       : which === 'infeasible'
         ? mockInfeasible
-        : which === 'adjust'
-          ? mockAdjust
-          : mockNormal;
+        : which === 'clarify'
+          ? mockClarify
+          : which === 'adjust'
+            ? mockAdjust
+            : mockNormal;
   const res = clone(payload);
+  if (which === 'clarify' && res.clarification) {
+    res.clarification.raw = instruction || res.clarification.raw;
+  }
   if (baseSlots && res.mode !== 'adjust' && res.solution) {
     res.mode = 'adjust';
   }
