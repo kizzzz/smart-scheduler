@@ -76,6 +76,13 @@ npm run dev        # http://localhost:5173，已配好 /api 代理
 
 前端支持 `?mock=1` 纯前端联调（含 `&case=` 切换正常/违规/无解/澄清态），不依赖后端。
 
+构建纯静态演示站（默认 mock，无需后端，仍可用 `?mock=0` 打真实接口）：
+
+```bash
+cd frontend
+VITE_DEMO_MOCK=1 npx vite build --outDir dist-demo
+```
+
 ## 部署
 
 单台服务器 + Docker Compose + Caddy，前后端同域，`/api` 反代，前端只用相对路径。
@@ -83,6 +90,14 @@ npm run dev        # http://localhost:5173，已配好 /api 代理
 ```bash
 cp .env.example .env      # 填入 GLM_API_KEY；有域名时把 SITE_ADDRESS 改成域名
 sudo bash deploy/bootstrap.sh
+```
+
+或者从本地一条命令部署（同步代码 → 写 .env → 装 Docker → 起服务 → 自检）：
+
+```bash
+GLM_API_KEY=<你的智谱 Key> bash deploy/remote-deploy.sh root@<服务器公网IP>
+# 有域名：
+GLM_API_KEY=xxx SITE_ADDRESS=sched.example.com bash deploy/remote-deploy.sh root@<IP>
 ```
 
 - `SITE_ADDRESS=:80`：纯 HTTP，适用于只有公网 IP 的情况。
