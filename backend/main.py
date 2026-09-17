@@ -7,7 +7,11 @@
 不要在本文件里写业务逻辑。
 """
 
+from fastapi import FastAPI
+
 from app.main import app  # noqa: F401
+
+assert isinstance(app, FastAPI)
 
 if __name__ == "__main__":
     import os
