@@ -85,6 +85,9 @@ VITE_DEMO_MOCK=1 npx vite build --outDir dist-demo
 
 ## 部署
 
+线上环境：http://43.134.136.29/ （腾讯云 Lighthouse，Ubuntu 24.04，`/opt/smart-scheduler`）。
+域名 `typexx.work` 的 A 记录指向该 IP 后，Caddy 会自动签发证书并跳 HTTPS。
+
 单台服务器 + Docker Compose + Caddy，前后端同域，`/api` 反代，前端只用相对路径。
 
 ```bash
