@@ -1,0 +1,20 @@
+# 前端静态托管：监听 80，SPA fallback 到 index.html
+# 后端 /api 由外层 Caddy / 网关同域反代到 FastAPI（前端代码一律使用相对路径 /api/...）
+:80 {
+	root * /srv
+	encode gzip zstd
+
+	# 带 hash 的静态资源可长缓存
+	@assets path /assets/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+	header /index.html Cache-Control "no-cache"
+
+	# 所有非静态路径回落到 index.html
+	try_files {path} /index.html
+	file_server
+
+	log {
+		output stdout
+		format console
+	}
+}

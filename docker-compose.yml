@@ -1,0 +1,52 @@
+# 智能排班助手 · 单机部署编排
+#
+#   web (Caddy)  :80/:443  →  静态前端 + /api 反代
+#   api (FastAPI):8000     →  意图解析 / 求解 / 校验 / 解释，仅内网暴露
+#
+# 启动：cp .env.example .env && 填入 GLM_API_KEY && docker compose up -d --build
+
+services:
+  api:
+    build:
+      context: ./backend
+    image: smart-scheduler-api:latest
+    restart: unless-stopped
+    environment:
+      GLM_API_KEY: ${GLM_API_KEY:?GLM_API_KEY 必须在 .env 中设置}
+      GLM_MODEL: ${GLM_MODEL:-glm-4-flash}
+      GLM_TIMEOUT: ${GLM_TIMEOUT:-12}
+      GLM_RETRIES: ${GLM_RETRIES:-2}
+      GLM_BASE_URL: ${GLM_BASE_URL:-https://open.bigmodel.cn/api/paas/v4}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+    expose:
+      - "8000"
+    networks:
+      - scheduler
+
+  web:
+    build:
+      context: ./frontend
+    image: smart-scheduler-web:latest
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+      ACME_EMAIL: ${ACME_EMAIL:-admin@example.com}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - scheduler
+
+networks:
+  scheduler:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:

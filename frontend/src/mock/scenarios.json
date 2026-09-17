@@ -1,0 +1,23 @@
+[
+  {
+    "id": "normal",
+    "title": "常规生成",
+    "description": "一句话生成下周完整排班，9 条硬规则零违规",
+    "instruction": "下周正常排班，尽量满足大家的班次偏好",
+    "base_required": false
+  },
+  {
+    "id": "leave_adjust",
+    "title": "临时请假重排",
+    "description": "已有排班的情况下最小扰动重排，只改必要的班次",
+    "instruction": "E17 周三周四临时请假，请在改动最少的前提下重排",
+    "base_required": true
+  },
+  {
+    "id": "manager_conflict",
+    "title": "值守冲突无解",
+    "description": "值守人力不足导致无可行解，给出三条解锁路径",
+    "instruction": "下周正常排班，注意 E01 周二培训、E02 和 E04 周二都请假",
+    "base_required": false
+  }
+]

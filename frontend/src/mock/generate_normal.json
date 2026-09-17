@@ -1,0 +1,325 @@
+{
+  "ok": true,
+  "mode": "generate",
+  "intent": {
+    "operation": "generate",
+    "period_label": "下周一至周日",
+    "objective_label": "偏好满足优先",
+    "chips": [
+      {
+        "key": "period",
+        "label": "周期",
+        "value": "下周一至周日",
+        "editable": true
+      },
+      {
+        "key": "constraints",
+        "label": "临时约束",
+        "value": "无额外临时约束",
+        "editable": true
+      },
+      {
+        "key": "objective",
+        "label": "优化目标",
+        "value": "偏好满足优先",
+        "editable": true
+      }
+    ],
+    "temp_constraints": [],
+    "degraded": false,
+    "degrade_reason": null
+  },
+  "solution": {
+    "found": true,
+    "slots": [
+      {
+        "day": "一",
+        "day_label": "周一",
+        "shift": "早班",
+        "shift_time": "09:00–17:00",
+        "min_required": 4,
+        "employees": [
+          "E01",
+          "E05",
+          "E06",
+          "E08",
+          "E11"
+        ]
+      },
+      {
+        "day": "一",
+        "day_label": "周一",
+        "shift": "晚班",
+        "shift_time": "13:00–21:00",
+        "min_required": 4,
+        "employees": [
+          "E02",
+          "E07",
+          "E09",
+          "E12",
+          "E16"
+        ]
+      },
+      {
+        "day": "二",
+        "day_label": "周二",
+        "shift": "早班",
+        "shift_time": "09:00–17:00",
+        "min_required": 4,
+        "employees": [
+          "E03",
+          "E05",
+          "E06",
+          "E17",
+          "E20"
+        ]
+      },
+      {
+        "day": "二",
+        "day_label": "周二",
+        "shift": "晚班",
+        "shift_time": "13:00–21:00",
+        "min_required": 4,
+        "employees": [
+          "E02",
+          "E07",
+          "E10",
+          "E12",
+          "E18"
+        ]
+      },
+      {
+        "day": "三",
+        "day_label": "周三",
+        "shift": "早班",
+        "shift_time": "09:00–17:00",
+        "min_required": 4,
+        "employees": [
+          "E01",
+          "E06",
+          "E08",
+          "E11",
+          "E17"
+        ]
+      },
+      {
+        "day": "三",
+        "day_label": "周三",
+        "shift": "晚班",
+        "shift_time": "13:00–21:00",
+        "min_required": 4,
+        "employees": [
+          "E04",
+          "E07",
+          "E09",
+          "E12",
+          "E16"
+        ]
+      },
+      {
+        "day": "四",
+        "day_label": "周四",
+        "shift": "早班",
+        "shift_time": "09:00–17:00",
+        "min_required": 4,
+        "employees": [
+          "E03",
+          "E05",
+          "E11",
+          "E17",
+          "E20"
+        ]
+      },
+      {
+        "day": "四",
+        "day_label": "周四",
+        "shift": "晚班",
+        "shift_time": "13:00–21:00",
+        "min_required": 4,
+        "employees": [
+          "E02",
+          "E07",
+          "E10",
+          "E12",
+          "E18"
+        ]
+      },
+      {
+        "day": "五",
+        "day_label": "周五",
+        "shift": "早班",
+        "shift_time": "09:00–17:00",
+        "min_required": 4,
+        "employees": [
+          "E04",
+          "E08",
+          "E11",
+          "E17",
+          "E20"
+        ]
+      },
+      {
+        "day": "五",
+        "day_label": "周五",
+        "shift": "晚班",
+        "shift_time": "13:00–21:00",
+        "min_required": 4,
+        "employees": [
+          "E02",
+          "E06",
+          "E09",
+          "E12",
+          "E14"
+        ]
+      },
+      {
+        "day": "六",
+        "day_label": "周六",
+        "shift": "早班",
+        "shift_time": "09:00–17:00",
+        "min_required": 6,
+        "employees": [
+          "E01",
+          "E10",
+          "E13",
+          "E15",
+          "E16",
+          "E17"
+        ]
+      },
+      {
+        "day": "六",
+        "day_label": "周六",
+        "shift": "晚班",
+        "shift_time": "13:00–21:00",
+        "min_required": 6,
+        "employees": [
+          "E03",
+          "E08",
+          "E11",
+          "E14",
+          "E19",
+          "E20"
+        ]
+      },
+      {
+        "day": "日",
+        "day_label": "周日",
+        "shift": "早班",
+        "shift_time": "09:00–17:00",
+        "min_required": 6,
+        "employees": [
+          "E04",
+          "E10",
+          "E13",
+          "E15",
+          "E16",
+          "E18"
+        ]
+      },
+      {
+        "day": "日",
+        "day_label": "周日",
+        "shift": "晚班",
+        "shift_time": "13:00–21:00",
+        "min_required": 6,
+        "employees": [
+          "E02",
+          "E06",
+          "E07",
+          "E09",
+          "E14",
+          "E19"
+        ]
+      }
+    ],
+    "soft_metrics": {
+      "preference_rate": 0.78,
+      "balance_score": 0.86,
+      "skill_redundancy": 1.4
+    },
+    "restarts_used": 3
+  },
+  "validation": {
+    "passed": true,
+    "violation_count": 0,
+    "rules": [
+      {
+        "id": "R-01",
+        "text": "每个班至少 1 名具备店长值守资格的员工",
+        "passed": true,
+        "violations": []
+      },
+      {
+        "id": "R-02",
+        "text": "每个班至少 2 名具备饮品制作技能的员工",
+        "passed": true,
+        "violations": []
+      },
+      {
+        "id": "R-03",
+        "text": "每个班至少 1 名具备收银技能的员工",
+        "passed": true,
+        "violations": []
+      },
+      {
+        "id": "R-04",
+        "text": "工作日每班 ≥4 人，周末每班 ≥6 人",
+        "passed": true,
+        "violations": []
+      },
+      {
+        "id": "R-05",
+        "text": "每人每周工时 ≤40 小时（≤5 个班）",
+        "passed": true,
+        "violations": []
+      },
+      {
+        "id": "R-06",
+        "text": "任何人不得连续工作超过 5 天",
+        "passed": true,
+        "violations": []
+      },
+      {
+        "id": "R-07",
+        "text": "晚班后不得接次日早班（间隔不足 12 小时）",
+        "passed": true,
+        "violations": []
+      },
+      {
+        "id": "R-08",
+        "text": "员工请假或不可用日期绝不排班",
+        "passed": true,
+        "violations": []
+      },
+      {
+        "id": "R-09",
+        "text": "技能仅取自员工档案，不得自行补充技能",
+        "passed": true,
+        "violations": []
+      }
+    ]
+  },
+  "explanation": {
+    "bullets": [
+      "周六周日按 R-04 需 6 人，可用兼职仅 E13 / E15 / E16 / E18 / E19，因此周末优先排入全部兼职。",
+      "E01、E02、E03、E04 是唯一具备店长值守资格的四人，按 R-01 被分散到 14 个班次的值守位，避免任一班次空缺。",
+      "E17 连续 5 天（周二至周六）已触及 R-06 上限，周日不再排班。",
+      "E12 偏好晚班且具备收银技能，因此承担周一至周五晚班的收银位，本周共 5 个班，正好触及 R-05 上限。"
+    ],
+    "unmet_preferences": [
+      "E06 周五被排入晚班（偏好早班），因该班次店长值守位已由 E02 占用，早班收银位无余量。",
+      "E20 周六被排入晚班（偏好早班），因周六早班已排满 6 人。"
+    ],
+    "degraded": false
+  },
+  "infeasible": null,
+  "diff": null,
+  "timing": {
+    "parse_ms": 820,
+    "solve_ms": 140,
+    "validate_ms": 3,
+    "explain_ms": 1900,
+    "total_ms": 2863
+  }
+}

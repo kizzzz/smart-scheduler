@@ -1,0 +1,487 @@
+{
+  "employees": [
+    {
+      "id": "E01",
+      "role": "店长",
+      "skills": [
+        "店长值守",
+        "饮品制作",
+        "收银",
+        "库存管理"
+      ],
+      "available_days": [
+        "一",
+        "二",
+        "三",
+        "四",
+        "五",
+        "六",
+        "日"
+      ],
+      "leave_days": [
+        "五"
+      ],
+      "preference": "早班"
+    },
+    {
+      "id": "E02",
+      "role": "副店长",
+      "skills": [
+        "店长值守",
+        "饮品制作",
+        "收银"
+      ],
+      "available_days": [
+        "一",
+        "二",
+        "三",
+        "四",
+        "五",
+        "六",
+        "日"
+      ],
+      "leave_days": [
+        "三"
+      ],
+      "preference": "晚班"
+    },
+    {
+      "id": "E03",
+      "role": "值班主管",
+      "skills": [
+        "店长值守",
+        "收银",
+        "库存管理"
+      ],
+      "available_days": [
+        "一",
+        "二",
+        "三",
+        "四",
+        "五",
+        "六",
+        "日"
+      ],
+      "leave_days": [
+        "日"
+      ],
+      "preference": "早班"
+    },
+    {
+      "id": "E04",
+      "role": "值班主管",
+      "skills": [
+        "店长值守",
+        "收银",
+        "饮品制作"
+      ],
+      "available_days": [
+        "一",
+        "二",
+        "三",
+        "四",
+        "五",
+        "六",
+        "日"
+      ],
+      "leave_days": [
+        "二"
+      ],
+      "preference": "晚班"
+    },
+    {
+      "id": "E05",
+      "role": "全职店员",
+      "skills": [
+        "饮品制作",
+        "收银"
+      ],
+      "available_days": [
+        "一",
+        "二",
+        "三",
+        "四",
+        "五",
+        "六",
+        "日"
+      ],
+      "leave_days": [
+        "三"
+      ],
+      "preference": "早班"
+    },
+    {
+      "id": "E06",
+      "role": "全职店员",
+      "skills": [
+        "饮品制作",
+        "库存管理"
+      ],
+      "available_days": [
+        "一",
+        "二",
+        "三",
+        "四",
+        "五",
+        "六",
+        "日"
+      ],
+      "leave_days": [
+        "四"
+      ],
+      "preference": "早班"
+    },
+    {
+      "id": "E07",
+      "role": "全职店员",
+      "skills": [
+        "饮品制作",
+        "收银"
+      ],
+      "available_days": [
+        "一",
+        "二",
+        "三",
+        "四",
+        "五",
+        "六",
+        "日"
+      ],
+      "leave_days": [
+        "六"
+      ],
+      "preference": "晚班"
+    },
+    {
+      "id": "E08",
+      "role": "全职店员",
+      "skills": [
+        "饮品制作",
+        "库存管理"
+      ],
+      "available_days": [
+        "一",
+        "二",
+        "三",
+        "四",
+        "五",
+        "六",
+        "日"
+      ],
+      "leave_days": [
+        "日"
+      ],
+      "preference": "早班"
+    },
+    {
+      "id": "E09",
+      "role": "全职店员",
+      "skills": [
+        "饮品制作",
+        "收银"
+      ],
+      "available_days": [
+        "一",
+        "二",
+        "三",
+        "四",
+        "五",
+        "六",
+        "日"
+      ],
+      "leave_days": [
+        "六"
+      ],
+      "preference": "晚班"
+    },
+    {
+      "id": "E10",
+      "role": "全职店员",
+      "skills": [
+        "收银",
+        "饮品制作"
+      ],
+      "available_days": [
+        "一",
+        "二",
+        "三",
+        "四",
+        "五",
+        "六",
+        "日"
+      ],
+      "leave_days": [
+        "三"
+      ],
+      "preference": "晚班"
+    },
+    {
+      "id": "E11",
+      "role": "全职店员",
+      "skills": [
+        "收银",
+        "饮品制作"
+      ],
+      "available_days": [
+        "一",
+        "二",
+        "三",
+        "四",
+        "五",
+        "六",
+        "日"
+      ],
+      "leave_days": [
+        "二"
+      ],
+      "preference": "早班"
+    },
+    {
+      "id": "E12",
+      "role": "全职店员",
+      "skills": [
+        "收银",
+        "饮品制作"
+      ],
+      "available_days": [
+        "一",
+        "二",
+        "三",
+        "四",
+        "五",
+        "六",
+        "日"
+      ],
+      "leave_days": [
+        "六"
+      ],
+      "preference": "晚班"
+    },
+    {
+      "id": "E13",
+      "role": "兼职店员",
+      "skills": [
+        "饮品制作"
+      ],
+      "available_days": [
+        "六",
+        "日"
+      ],
+      "leave_days": [],
+      "preference": "早班"
+    },
+    {
+      "id": "E14",
+      "role": "兼职店员",
+      "skills": [
+        "饮品制作",
+        "收银"
+      ],
+      "available_days": [
+        "四",
+        "五",
+        "六",
+        "日"
+      ],
+      "leave_days": [],
+      "preference": "晚班"
+    },
+    {
+      "id": "E15",
+      "role": "兼职店员",
+      "skills": [
+        "饮品制作"
+      ],
+      "available_days": [
+        "四",
+        "五",
+        "六",
+        "日"
+      ],
+      "leave_days": [],
+      "preference": "早班"
+    },
+    {
+      "id": "E16",
+      "role": "兼职店员",
+      "skills": [
+        "收银",
+        "饮品制作"
+      ],
+      "available_days": [
+        "一",
+        "三",
+        "五",
+        "六",
+        "日"
+      ],
+      "leave_days": [],
+      "preference": "晚班"
+    },
+    {
+      "id": "E17",
+      "role": "兼职店员",
+      "skills": [
+        "饮品制作"
+      ],
+      "available_days": [
+        "一",
+        "二",
+        "三",
+        "四",
+        "五",
+        "六"
+      ],
+      "leave_days": [
+        "一"
+      ],
+      "preference": "早班"
+    },
+    {
+      "id": "E18",
+      "role": "兼职店员",
+      "skills": [
+        "饮品制作",
+        "收银"
+      ],
+      "available_days": [
+        "一",
+        "二",
+        "四",
+        "六",
+        "日"
+      ],
+      "leave_days": [],
+      "preference": "晚班"
+    },
+    {
+      "id": "E19",
+      "role": "兼职店员",
+      "skills": [
+        "收银",
+        "饮品制作"
+      ],
+      "available_days": [
+        "五",
+        "六",
+        "日"
+      ],
+      "leave_days": [],
+      "preference": "晚班"
+    },
+    {
+      "id": "E20",
+      "role": "兼职店员",
+      "skills": [
+        "饮品制作",
+        "库存管理"
+      ],
+      "available_days": [
+        "二",
+        "三",
+        "四",
+        "五",
+        "六",
+        "日"
+      ],
+      "leave_days": [
+        "日"
+      ],
+      "preference": "早班"
+    }
+  ],
+  "rules": [
+    {
+      "id": "R-01",
+      "text": "每个班至少 1 名具备店长值守资格的员工"
+    },
+    {
+      "id": "R-02",
+      "text": "每个班至少 2 名具备饮品制作技能的员工"
+    },
+    {
+      "id": "R-03",
+      "text": "每个班至少 1 名具备收银技能的员工"
+    },
+    {
+      "id": "R-04",
+      "text": "工作日每班 ≥4 人，周末每班 ≥6 人"
+    },
+    {
+      "id": "R-05",
+      "text": "每人每周工时 ≤40 小时（≤5 个班）"
+    },
+    {
+      "id": "R-06",
+      "text": "任何人不得连续工作超过 5 天"
+    },
+    {
+      "id": "R-07",
+      "text": "晚班后不得接次日早班（间隔不足 12 小时）"
+    },
+    {
+      "id": "R-08",
+      "text": "员工请假或不可用日期绝不排班"
+    },
+    {
+      "id": "R-09",
+      "text": "技能仅取自员工档案，不得自行补充技能"
+    }
+  ],
+  "days": [
+    {
+      "key": "一",
+      "label": "周一",
+      "is_weekend": false,
+      "min_required": 4
+    },
+    {
+      "key": "二",
+      "label": "周二",
+      "is_weekend": false,
+      "min_required": 4
+    },
+    {
+      "key": "三",
+      "label": "周三",
+      "is_weekend": false,
+      "min_required": 4
+    },
+    {
+      "key": "四",
+      "label": "周四",
+      "is_weekend": false,
+      "min_required": 4
+    },
+    {
+      "key": "五",
+      "label": "周五",
+      "is_weekend": false,
+      "min_required": 4
+    },
+    {
+      "key": "六",
+      "label": "周六",
+      "is_weekend": true,
+      "min_required": 6
+    },
+    {
+      "key": "日",
+      "label": "周日",
+      "is_weekend": true,
+      "min_required": 6
+    }
+  ],
+  "shifts": [
+    {
+      "key": "早班",
+      "label": "早班",
+      "time": "09:00–17:00"
+    },
+    {
+      "key": "晚班",
+      "label": "晚班",
+      "time": "13:00–21:00"
+    }
+  ]
+}

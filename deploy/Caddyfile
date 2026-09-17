@@ -1,0 +1,48 @@
+# 边缘 Caddy 配置：静态前端 + /api 反代 FastAPI
+#
+# SITE_ADDRESS 决定是否自动签发 HTTPS：
+#   - 未设置（默认 :80）：仅 HTTP，适用于「只有公网 IP、没有域名」的情况；
+#   - 设置为域名（如 scheduler.example.com）：Caddy 自动申请并续期 Let's Encrypt 证书，自动 301 到 HTTPS。
+{
+	email {$ACME_EMAIL:admin@example.com}
+	admin off
+}
+
+{$SITE_ADDRESS::80} {
+	encode gzip zstd
+
+	# 后端 API：同域 /api 前缀，前端全部使用相对路径，无需 CORS
+	handle /api/* {
+		reverse_proxy api:8000 {
+			health_uri /api/health
+			health_interval 30s
+			transport http {
+				read_timeout 60s
+			}
+		}
+	}
+
+	# 静态前端
+	handle {
+		root * /srv
+
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		header /index.html Cache-Control "no-cache"
+
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options SAMEORIGIN
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
