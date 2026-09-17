@@ -45,8 +45,12 @@ echo "==> 3/4 写入服务端 .env"
 ssh "$TARGET" "cat > '$REMOTE_DIR/.env' && chmod 600 '$REMOTE_DIR/.env'" <<EOF
 GLM_API_KEY=${GLM_API_KEY:-}
 GLM_MODEL=${GLM_MODEL:-glm-4-flash}
+GLM_TIMEOUT=${GLM_TIMEOUT:-12}
+GLM_RETRIES=${GLM_RETRIES:-2}
 SITE_ADDRESS=${SITE_ADDRESS}
+SERVER_IP=${SERVER_IP:-${TARGET#*@}}
 ACME_EMAIL=${ACME_EMAIL:-}
+CORS_ORIGINS=*
 EOF
 
 echo "==> 4/4 安装 Docker 并启动"

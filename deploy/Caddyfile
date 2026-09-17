@@ -1,14 +1,19 @@
 # 边缘 Caddy 配置：静态前端 + /api 反代 FastAPI
 #
-# SITE_ADDRESS 决定是否自动签发 HTTPS：
-#   - 未设置（默认 :80）：仅 HTTP，适用于「只有公网 IP、没有域名」的情况；
-#   - 设置为域名（如 scheduler.example.com）：Caddy 自动申请并续期 Let's Encrypt 证书，自动 301 到 HTTPS。
+# 两个站点地址同时生效，互不冲突：
+#   1. {$SITE_ADDRESS::80}          域名站点。设成域名时 Caddy 自动申请 / 续期
+#      Let's Encrypt 证书并 301 到 HTTPS；DNS 还没解析过来时 ACME 会后台重试，
+#      不影响下面的 IP 直连。未设置时退化为 :80 catch-all（纯 HTTP）。
+#   2. http://{$SERVER_IP:127.0.0.1} IP 直连站点，纯 HTTP。用于域名还没生效、
+#      或运维想绕开域名自检的场景。未设置时指向 127.0.0.1，对外无影响。
+#
+# 站点逻辑只写一份，用 snippet 复用。
 {
 	email {$ACME_EMAIL:admin@example.com}
 	admin off
 }
 
-{$SITE_ADDRESS::80} {
+(app) {
 	encode gzip zstd
 
 	# 后端 API：同域 /api 前缀，前端全部使用相对路径，无需 CORS
@@ -45,4 +50,12 @@
 		output stdout
 		format console
 	}
+}
+
+{$SITE_ADDRESS::80} {
+	import app
+}
+
+http://{$SERVER_IP:127.0.0.1} {
+	import app
 }
