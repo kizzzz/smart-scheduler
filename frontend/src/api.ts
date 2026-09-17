@@ -35,9 +35,17 @@ function params(): URLSearchParams {
   return new URLSearchParams(window.location.search);
 }
 
+/**
+ * mock 优先级：URL 参数 > 构建期开关。
+ *
+ * `VITE_DEMO_MOCK=1` 用于「无后端的纯静态演示站」构建：默认走 mock，
+ * 但仍可用 `?mock=0` 强制打真实接口。正式 Docker 构建不设该变量，
+ * 默认永远打真实后端。
+ */
 export function isMockMode(): boolean {
   const v = params().get('mock');
-  return v === '1' || v === 'true';
+  if (v !== null) return v === '1' || v === 'true';
+  return import.meta.env.VITE_DEMO_MOCK === '1';
 }
 
 export function mockCaseOverride(): MockCase | null {
