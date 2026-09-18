@@ -8,14 +8,17 @@
   cd backend && python -m uvicorn app.main:app --port 8099 &
   cd frontend && VITE_API_TARGET=http://127.0.0.1:8099 npx vite --port 5199 &
   python frontend/integration_check.py
+
+验收线上环境：CHECK_BASE=https://typexx.work python frontend/integration_check.py
 """
 import asyncio
+import os
 import pathlib
 import sys
 
 from playwright.async_api import async_playwright
 
-BASE = "http://127.0.0.1:5199"
+BASE = os.getenv("CHECK_BASE", "http://127.0.0.1:5199")
 SAMPLES = pathlib.Path(__file__).resolve().parent.parent / "samples"
 OUT = pathlib.Path("/tmp/integration_shots")
 OUT.mkdir(exist_ok=True)
