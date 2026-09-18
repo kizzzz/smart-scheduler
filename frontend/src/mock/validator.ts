@@ -218,25 +218,43 @@ export function mockValidate(meta: Meta, slots: Slot[]): ValidateResponse {
 
 export function mockSoftMetrics(meta: Meta, slots: Slot[]) {
   const empMap = new Map(meta.employees.map((e) => [e.id, e]));
-  let total = 0;
-  let matched = 0;
+  // 三个指标的口径必须与后端 validator.soft_metrics / serializers.soft_metrics_out 完全一致，
+  // 否则 mock 演示站和真实环境会对同一张排班表给出不同的软指标，比对时无法互信。
+  let hit = 0;
+  let prefTotal = 0;
   const counts = new Map<string, number>();
+  // 技能冗余：值守超出 1 名 + 饮品超出 2 名 + 收银超出 1 名
   let redundancy = 0;
   for (const s of slots) {
-    for (const e of s.employees) {
-      total += 1;
-      if (empMap.get(e)?.preference === s.shift) matched += 1;
+    const ids = [...new Set(s.employees)].filter((e) => empMap.has(e));
+    for (const e of ids) {
       counts.set(e, (counts.get(e) ?? 0) + 1);
+      const pref = empMap.get(e)?.preference;
+      // 只有「有偏好」的员工才进分母 —— 无偏好的人不该被算成没被满足
+      if (pref) {
+        prefTotal += 1;
+        if (pref === s.shift) hit += 1;
+      }
     }
-    redundancy += s.employees.filter((e) => empMap.get(e)?.skills.includes(SKILL_DRINK)).length / 2;
+    const withSkill = (skill: string) =>
+      ids.filter((e) => empMap.get(e)?.skills.includes(skill)).length;
+    redundancy += Math.max(0, withSkill(SKILL_MANAGER) - 1);
+    redundancy += Math.max(0, withSkill(SKILL_DRINK) - 2);
+    redundancy += Math.max(0, withSkill(SKILL_CASHIER) - 1);
   }
-  const values = meta.employees.map((e) => counts.get(e.id) ?? 0);
-  const mean = values.reduce((a, b) => a + b, 0) / Math.max(1, values.length);
-  const variance = values.reduce((a, b) => a + (b - mean) ** 2, 0) / Math.max(1, values.length);
-  const balance = mean > 0 ? Math.max(0, 1 - Math.sqrt(variance) / (mean + 1)) : 0;
+  // 均衡度只统计「排到过班」的员工，与后端一致；标准差 0 记 1 分，≥1.5 记 0 分
+  const working = [...counts.values()].filter((v) => v > 0);
+  const mean = working.reduce((a, b) => a + b, 0) / Math.max(1, working.length);
+  const stdev =
+    working.length > 1
+      ? Math.sqrt(working.reduce((a, b) => a + (b - mean) ** 2, 0) / working.length)
+      : 0;
+  const balance = Math.max(0, Math.min(1, 1 - stdev / 1.5));
+  // 归一化到 0–1：平均每班 8 人次冗余记满分，否则进度条会画出 240% 这种数
+  const avgRedundancy = redundancy / Math.max(1, slots.length);
   return {
-    preference_rate: total ? Number((matched / total).toFixed(2)) : 0,
-    balance_score: Number(balance.toFixed(2)),
-    skill_redundancy: Number((redundancy / Math.max(1, slots.length)).toFixed(1)),
+    preference_rate: prefTotal ? Number((hit / prefTotal).toFixed(4)) : 0,
+    balance_score: Number(balance.toFixed(4)),
+    skill_redundancy: Number(Math.min(1, avgRedundancy / 8).toFixed(3)),
   };
 }
