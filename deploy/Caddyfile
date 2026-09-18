@@ -4,6 +4,10 @@
 #   1. {$SITE_ADDRESS::80}          域名站点。设成域名时 Caddy 自动申请 / 续期
 #      Let's Encrypt 证书并 301 到 HTTPS；DNS 还没解析过来时 ACME 会后台重试，
 #      不影响下面的 IP 直连。未设置时退化为 :80 catch-all（纯 HTTP）。
+#      要多个域名共用一张证书时用逗号分隔，例如：
+#        SITE_ADDRESS=typexx.work, www.typexx.work
+#      两个域名指向同一份内容，不做 www → 主域跳转：少一层重定向、
+#      少一个站点块，IP 直连回退路径也不会被影响。
 #   2. http://{$SERVER_IP:127.0.0.1} IP 直连站点，纯 HTTP。用于域名还没生效、
 #      或运维想绕开域名自检的场景。未设置时指向 127.0.0.1，对外无影响。
 #

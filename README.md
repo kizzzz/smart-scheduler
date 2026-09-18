@@ -85,8 +85,8 @@ VITE_DEMO_MOCK=1 npx vite build --outDir dist-demo
 
 ## 部署
 
-线上环境：http://43.134.136.29/ （腾讯云 Lighthouse，Ubuntu 24.04，`/opt/smart-scheduler`）。
-域名 `typexx.work` 的 A 记录指向该 IP 后，Caddy 会自动签发证书并跳 HTTPS。
+线上环境：**https://typexx.work/** （`www.typexx.work` 同样可用，两个域名各自持有 Let's Encrypt 证书，HTTP 自动 308 跳 HTTPS）。
+IP 直连 http://43.134.136.29/ 作为回退通道保留。腾讯云 Lighthouse，ap-singapore-2，Ubuntu 24.04，`/opt/smart-scheduler`。
 
 单台服务器 + Docker Compose + Caddy，前后端同域，`/api` 反代，前端只用相对路径。
 
@@ -105,6 +105,7 @@ GLM_API_KEY=xxx SITE_ADDRESS=sched.example.com bash deploy/remote-deploy.sh root
 
 - `SITE_ADDRESS=:80`：纯 HTTP，适用于只有公网 IP 的情况。
 - `SITE_ADDRESS=your.domain`：Caddy 自动申请并续期 Let's Encrypt 证书，自动跳 HTTPS。**只有 IP 没有域名时无法签发公网信任证书**，这是 CA 的限制，不是配置问题。
+- `SITE_ADDRESS=your.domain, www.your.domain`：多域名逗号分隔，Caddy 为每个域名各自签发并续期证书。改完这个变量要用 `docker compose up -d` 重建容器，`restart` 不会重新读取环境变量。
 
 API Key 只存在于服务端环境变量，不进镜像、不进仓库、不下发前端。
 
