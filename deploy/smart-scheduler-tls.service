@@ -1,0 +1,22 @@
+[Unit]
+# 守着 DNS：typexx.work 的 A 记录一生效，就立刻让 Caddy 重试签发证书。
+# 单独做成 systemd 单元而不是 nohup 后台进程，是为了两件事：
+#   1. 服务器重启后自动继续守；
+#   2. 一轮等待超时后自动重来，不需要人再登服务器。
+Description=Wait for DNS then trigger Caddy TLS issuance (smart-scheduler)
+After=docker.service network-online.target
+Wants=docker.service network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/smart-scheduler
+# 参数：域名 期望IP 轮询间隔(s) 单轮最长等待(s)
+ExecStart=/usr/bin/env bash deploy/wait-dns-then-tls.sh typexx.work 43.134.136.29 60 86400
+StandardOutput=append:/var/log/smart-scheduler-tls.log
+StandardError=append:/var/log/smart-scheduler-tls.log
+# oneshot + on-failure：超时(exit 1)后隔 1 分钟再起一轮；成功(exit 0)即停止，不再打扰
+Restart=on-failure
+RestartSec=60
+
+[Install]
+WantedBy=multi-user.target

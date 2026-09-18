@@ -108,6 +108,33 @@ GLM_API_KEY=xxx SITE_ADDRESS=sched.example.com bash deploy/remote-deploy.sh root
 
 API Key 只存在于服务端环境变量，不进镜像、不进仓库、不下发前端。
 
+### 域名解析生效后自动签发证书
+
+Caddy 在 ACME 连续失败后会指数退避到几十分钟一次，域名刚配好那一刻它不会立刻重试。
+`deploy/smart-scheduler-tls.service` 就是替人守着：轮询 A 记录，一生效就重启 web 触发签发，然后自检 HTTPS。
+
+```bash
+sudo cp deploy/smart-scheduler-tls.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable smart-scheduler-tls.service
+sudo systemctl start --no-block smart-scheduler-tls.service   # ExecStart 是长等待，别用 --now
+tail -f /var/log/smart-scheduler-tls.log
+```
+
+做成 systemd 单元而不是 `nohup` 后台进程，是为了两件事：服务器重启后自动接着守；一轮等待超时后自动重来。
+签发成功后脚本 `exit 0`，`Restart=on-failure` 不会再拉起它。
+
+### 推送到 GitHub
+
+```bash
+GITHUB_TOKEN=<你的 token> bash deploy/publish-github.sh
+```
+
+脚本会依次校验身份 → 建仓（已存在则跳过）→ 推代码 → 自检，凭证走请求头不落盘到 `.git/config`。
+token 权限二选一：classic token 勾 `repo`；或 fine-grained token 设 Repository access = All repositories，
+并打开 `Administration = Read and write`（建仓）与 `Contents = Read and write`（推代码）。
+只有读权限会在第 2 步明确报 `Resource not accessible by personal access token`。
+
 ## API
 
 | 方法 | 路径 | 说明 |
@@ -133,9 +160,9 @@ backend/
   app/llm.py          L1/L4 GLM 接入 + 降级 + 防幻觉清洗
   app/serializers.py  内部模型 → 前端契约
   app/main.py         FastAPI 路由
-  tests/              41 个测试
+  tests/              48 个测试
 frontend/             React 19 + TS + Vite + Tailwind
-deploy/               Caddyfile + 服务器初始化脚本
+deploy/               Caddyfile + 服务器初始化 / 一键部署 / TLS 守护 / GitHub 发布脚本
 ```
 
 ## 已知边界
