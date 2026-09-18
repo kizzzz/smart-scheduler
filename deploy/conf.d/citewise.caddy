@@ -1,0 +1,35 @@
+# CiteWise V3（自托管）站点 —— 与 smart-scheduler 共用本机的 80/443
+#
+# 由主 Caddyfile 的 `import conf.d/*.caddy` 加载。放在独立文件里的原因：
+# 主 Caddyfile 属于 smart-scheduler 项目，两个产品的站点配置解耦，
+# 后续任一侧重新部署都不会覆盖对方。
+#
+# 反代目标 citewise:8000 是 /opt/citewise 那个 compose 栈的服务名，
+# 它以别名 citewise 接入了同一个 docker 网络（smart-scheduler_scheduler）。
+xx27.xyz, www.xx27.xyz {
+	encode gzip zstd
+
+	reverse_proxy citewise:8000 {
+		# SSE：/api/chat 走 EventSourceResponse 流式返回，必须关闭响应缓冲，
+		# 否则前端要等整段生成结束才一次性收到，Agent Timeline 也不会动。
+		flush_interval -1
+
+		transport http {
+			# 一次带 RAG 的多 Agent 回答最坏情况可达数分钟（检索 + 多轮 LLM），
+			# 超时给足 600s，避免「后端还在算、边缘先返回 504」。
+			read_timeout 600s
+			write_timeout 600s
+		}
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

@@ -34,7 +34,13 @@
 			lb_try_interval 250ms
 
 			transport http {
-				read_timeout 60s
+				# 必须覆盖后端最坏情况，否则会出现「后端还在算、边缘先返回 504」。
+				# 预算链：一次 /api/generate 跑两趟 LLM（意图解析 + 解释生成），
+				# 默认模型 glm-4.5-flash 每趟预算 75s（models_registry.timeout_for），
+				# 所以最坏约 150s，取 180s 留余量。
+				# 这里原来是 60s：默认模型换成慢模型后立刻踩到 504（已实测复现）。
+				# 换更慢的默认模型时，这个值要跟着 timeout_for 一起改。
+				read_timeout 180s
 			}
 		}
 	}
@@ -67,6 +73,11 @@
 {$SITE_ADDRESS::80} {
 	import app
 }
+
+# 同机其他产品的站点（例如 CiteWise 的 xx27.xyz），配置解耦在 deploy/conf.d/ 下。
+# 注意：glob 至少要匹配到一个文件，仓库里已带 conf.d/citewise.caddy，
+# 单独部署本项目时若删空该目录，需同时删掉这一行。
+import conf.d/*.caddy
 
 http://{$SERVER_IP:127.0.0.1} {
 	import app

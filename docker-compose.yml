@@ -13,7 +13,8 @@ services:
     restart: unless-stopped
     environment:
       GLM_API_KEY: ${GLM_API_KEY:?GLM_API_KEY 必须在 .env 中设置}
-      GLM_MODEL: ${GLM_MODEL:-glm-4-flash}
+      # 默认 glm-4.5-flash（最准，整体约 50 秒）；慢模型的超时由后端按实测耗时自动放宽
+      GLM_MODEL: ${GLM_MODEL:-glm-4.5-flash}
       GLM_TIMEOUT: ${GLM_TIMEOUT:-12}
       GLM_RETRIES: ${GLM_RETRIES:-2}
       GLM_BASE_URL: ${GLM_BASE_URL:-https://open.bigmodel.cn/api/paas/v4}
@@ -42,6 +43,8 @@ services:
       - "443:443"
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # 同机其他产品的站点配置（由主 Caddyfile 的 import conf.d/*.caddy 加载）
+      - ./deploy/conf.d:/etc/caddy/conf.d:ro
       - caddy_data:/data
       - caddy_config:/config
     networks:
