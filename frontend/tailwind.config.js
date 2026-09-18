@@ -57,11 +57,17 @@ export default {
           '0%,100%': { opacity: '1' },
           '50%': { opacity: '0.45' },
         },
+        // 图片识别要等约 10 秒，需要一条持续横向移动的进度条来证明「还在跑」
+        'progress-slide': {
+          '0%': { transform: 'translateX(-110%)' },
+          '100%': { transform: 'translateX(340%)' },
+        },
       },
       animation: {
         flash: 'flash 600ms ease-out 1',
         'fade-in': 'fade-in 160ms ease-out 1',
         shimmer: 'shimmer 1.4s ease-in-out infinite',
+        'progress-slide': 'progress-slide 1.5s ease-in-out infinite',
       },
     },
   },

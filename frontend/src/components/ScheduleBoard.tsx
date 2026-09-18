@@ -1,4 +1,4 @@
-import { CalendarRange, CircleAlert, Loader2, Plus, RotateCcw, Sparkles } from 'lucide-react';
+import { CalendarRange, CircleAlert, FileUp, Loader2, Plus, RotateCcw, Sparkles } from 'lucide-react';
 import type { Meta, Slot } from '../types';
 import { cn, slotKey } from '../lib/utils';
 import { Badge } from './ui/Badge';
@@ -19,6 +19,7 @@ export function ScheduleBoard({
   flashKeys,
   dirty,
   validating,
+  origin = 'generated',
   onPickChip,
   onAddEmployee,
   onReoptimize,
@@ -31,6 +32,8 @@ export function ScheduleBoard({
   flashKeys: Map<string, number>;
   dirty: boolean;
   validating: boolean;
+  /** 表的来源：导入的基线不是 AI 生成的，状态徽标与副标题都不该说「已生成」 */
+  origin?: 'generated' | 'imported';
   onPickChip: (slot: Slot, employeeId: string) => void;
   onAddEmployee: (slot: Slot) => void;
   onReoptimize: () => void;
@@ -42,13 +45,18 @@ export function ScheduleBoard({
   const shifts = meta.shifts;
   const bySlot = new Map(slots.map((s) => [slotKey(s.day, s.shift), s]));
   const headcount = slots.reduce((n, s) => n + s.employees.length, 0);
+  const imported = origin === 'imported';
 
   return (
     <Card className="overflow-hidden">
       <CardHeader
         icon={<CalendarRange size={15} />}
         title="一周排班看板"
-        subtitle="AI 出 0→80 的草案，店长做 80→100 的微调"
+        subtitle={
+          imported
+            ? '当前基线来自导入的排班表，可继续用自然语言微调或点击换人'
+            : 'AI 出 0→80 的草案，店长做 80→100 的微调'
+        }
         right={
           <>
             <Badge tone="neutral">共 {headcount} 人次</Badge>
@@ -58,6 +66,10 @@ export function ScheduleBoard({
               </Badge>
             ) : dirty ? (
               <Badge tone="pend">微调态 · 已本地修改</Badge>
+            ) : imported ? (
+              <Badge tone="teal" icon={<FileUp size={10} />}>
+                导入基线
+              </Badge>
             ) : (
               <Badge tone="pass">已生成</Badge>
             )}
@@ -128,7 +140,7 @@ export function ScheduleBoard({
             {dirty ? (
               <Button size="sm" variant="ghost" onClick={onReset}>
                 <RotateCcw size={12} />
-                还原本次生成
+                {imported ? '还原导入基线' : '还原本次生成'}
               </Button>
             ) : null}
             <Button size="sm" variant="outline" onClick={onReoptimize} disabled={!canReoptimize}>

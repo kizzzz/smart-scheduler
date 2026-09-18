@@ -1,0 +1,100 @@
+{
+  "default_text": "glm-4-flash",
+  "default_vision": "glm-4v-flash",
+  "text": [
+    {
+      "id": "glm-4-flash",
+      "label": "GLM-4-Flash",
+      "tier": "free",
+      "is_default": true,
+      "latency_hint": "约 4–8 秒",
+      "accuracy_hint": "均衡",
+      "note": "默认。实测偶发编造未提及员工的约束，已被护栏拦截",
+      "measured": {
+        "avg_latency_s": 8.3,
+        "hallucinated_cases": "2/3",
+        "probed_at": "2026-09-18"
+      }
+    },
+    {
+      "id": "glm-4-flash-250414",
+      "label": "GLM-4-Flash-250414",
+      "tier": "free",
+      "is_default": false,
+      "latency_hint": "约 4 秒（最快）",
+      "accuracy_hint": "偏快，编造较多",
+      "note": "响应最快，但实测 3 个 case 里 2 个编造了指令未提及的员工约束",
+      "measured": {
+        "avg_latency_s": 3.7,
+        "hallucinated_cases": "2/3",
+        "probed_at": "2026-09-18"
+      }
+    },
+    {
+      "id": "glm-4.5-flash",
+      "label": "GLM-4.5-Flash",
+      "tier": "free",
+      "is_default": false,
+      "latency_hint": "约 30 秒（最慢）",
+      "accuracy_hint": "最准，零编造",
+      "note": "实测 3 个 case 全部正确、无编造；代价是首字节等待明显变长",
+      "measured": {
+        "avg_latency_s": 30.1,
+        "hallucinated_cases": "0/3",
+        "probed_at": "2026-09-18"
+      }
+    }
+  ],
+  "vision": [
+    {
+      "id": "glm-4v-flash",
+      "label": "GLM-4V-Flash",
+      "tier": "free",
+      "is_default": true,
+      "latency_hint": "约 10 秒",
+      "accuracy_hint": "清晰表格实测全对",
+      "note": "默认。实测 14/14 格、64/64 人次、0 误报",
+      "max_output_tokens": 1024,
+      "measured": {
+        "avg_latency_s": 9.5,
+        "cell_accuracy": "14/14",
+        "probed_at": "2026-09-18"
+      }
+    },
+    {
+      "id": "glm-4.1v-thinking-flash",
+      "label": "GLM-4.1V-Thinking-Flash",
+      "tier": "free",
+      "is_default": false,
+      "latency_hint": "约 11 秒",
+      "accuracy_hint": "偶发截断",
+      "note": "备选。首次调用曾因思维链过长导致输出截断，重试后全对",
+      "max_output_tokens": 1024,
+      "measured": {
+        "avg_latency_s": 10.7,
+        "cell_accuracy": "14/14",
+        "probed_at": "2026-09-18"
+      }
+    }
+  ],
+  "locked": [
+    {
+      "id": "glm-4-plus",
+      "reason": "当前 API Key 余额不足（错误码 1113）"
+    },
+    {
+      "id": "glm-4.6",
+      "reason": "当前 API Key 余额不足（错误码 1113）"
+    },
+    {
+      "id": "glm-4v-plus",
+      "reason": "当前 API Key 余额不足（错误码 1113）"
+    },
+    {
+      "id": "glm-z1-flash",
+      "reason": "探测中 3 次里 2 次触发 429 速率限制，可用性不达标"
+    }
+  ],
+  "boundary_note": "模型只影响自然语言理解与解释的质量，不影响排班正确性。排班可行性由确定性求解器与独立校验器保证，换模型不会让违规的排班变合规。",
+  "unlock_note": "充值后设置环境变量 GLM_EXTRA_MODELS=glm-4-plus,glm-4.6 即可放开，无需改代码。"
+}

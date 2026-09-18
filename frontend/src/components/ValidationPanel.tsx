@@ -21,6 +21,9 @@ export function ValidationPanel({
   validating,
   pending = false,
   pendingHint,
+  subtitle,
+  suggestionsDisabled = false,
+  suggestionsHint,
   onApplySuggestion,
 }: {
   meta: Meta;
@@ -30,6 +33,10 @@ export function ValidationPanel({
   /** 没有排班可校验（澄清态 / 无解态）：全部规则显示为灰色「待排班」，不显示红色违规 */
   pending?: boolean;
   pendingHint?: string;
+  subtitle?: string;
+  /** 导入确认态：结论要看得见，但修复建议要等应用为基线之后才能点，避免改到一份还没生效的表 */
+  suggestionsDisabled?: boolean;
+  suggestionsHint?: string;
   onApplySuggestion: (s: Suggestion) => void;
 }) {
   const byId = new Map((validation?.rules ?? []).map((r) => [r.id, r]));
@@ -49,7 +56,7 @@ export function ValidationPanel({
         subtitle={
           pending
             ? pendingHint ?? '本次没有产出排班，硬规则尚未参与校验'
-            : '校验器独立于求解器，任何来源的排班都过同一套硬规则'
+            : subtitle ?? '校验器独立于求解器，任何来源的排班都过同一套硬规则'
         }
         right={
           pending ? (
@@ -74,7 +81,14 @@ export function ValidationPanel({
       <CardBody>
         <div className="grid gap-x-5 gap-y-0.5 md:grid-cols-2">
           {rows.map((r) => (
-            <RuleRow key={r.id} rule={r} pending={pending} onApplySuggestion={onApplySuggestion} />
+            <RuleRow
+              key={r.id}
+              rule={r}
+              pending={pending}
+              suggestionsDisabled={suggestionsDisabled}
+              suggestionsHint={suggestionsHint}
+              onApplySuggestion={onApplySuggestion}
+            />
           ))}
         </div>
 
@@ -124,13 +138,18 @@ function violationScope(day: string, shift: string): string {
 function RuleRow({
   rule,
   pending,
+  suggestionsDisabled,
+  suggestionsHint,
   onApplySuggestion,
 }: {
   rule: RuleResult;
   pending: boolean;
+  suggestionsDisabled: boolean;
+  suggestionsHint?: string;
   onApplySuggestion: (s: Suggestion) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  // 导入确认态默认把违规明细展开：体检结论是导入功能的主角，不该让用户再点一次才看见
+  const [open, setOpen] = useState(suggestionsDisabled);
   const failed = !pending && !rule.passed;
 
   return (
@@ -205,8 +224,9 @@ function RuleRow({
                     <button
                       key={`${s.label}-${j}`}
                       type="button"
+                      disabled={suggestionsDisabled}
                       onClick={() => onApplySuggestion(s)}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-fail-border bg-white px-2 py-1 text-[11.5px] font-semibold text-fail-deep transition-colors duration-150 hover:border-fail hover:bg-fail-bg focus-ring"
+                      className="inline-flex items-center gap-1.5 rounded-md border border-fail-border bg-white px-2 py-1 text-[11.5px] font-semibold text-fail-deep transition-colors duration-150 hover:border-fail hover:bg-fail-bg disabled:cursor-not-allowed disabled:border-line disabled:bg-soft disabled:text-mut focus-ring"
                     >
                       <Wrench size={11} />
                       {s.label}
@@ -220,7 +240,11 @@ function RuleRow({
               )}
             </div>
           ))}
-          <p className="pl-4 text-[10.5px] text-mut">点击修复建议将直接改动本地排班并重新校验。</p>
+          <p className="pl-4 text-[10.5px] text-mut">
+            {suggestionsDisabled
+              ? suggestionsHint ?? '修复建议在这张表成为基线后可用。'
+              : '点击修复建议将直接改动本地排班并重新校验。'}
+          </p>
         </div>
       ) : null}
     </div>

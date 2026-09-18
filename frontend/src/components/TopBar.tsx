@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Activity, CalendarCheck2, FlaskConical } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -7,10 +8,13 @@ export function TopBar({
   health,
   mock,
   onRecheck,
+  modelPicker,
 }: {
   health: HealthState;
   mock: boolean;
   onRecheck: () => void;
+  /** 模型选择器由 App 组装后塞进来，TopBar 不感知模型状态 */
+  modelPicker?: ReactNode;
 }) {
   const dot = {
     checking: 'bg-mut-2',
@@ -36,6 +40,7 @@ export function TopBar({
               Mock 数据模式
             </span>
           ) : null}
+          {modelPicker}
           <button
             type="button"
             onClick={onRecheck}

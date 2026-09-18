@@ -34,6 +34,25 @@ class SoftPreference(BaseModel):
     weight: float = 1.0
 
 
+class GuardrailStats(BaseModel):
+    """反幻觉护栏的拦截统计。
+
+    存在的意义不是做报表，而是让架构价值可见：实测 glm-4-flash 在
+    「E05 周六请假，周末早班多留一个收银」上会额外编一条 E06 的固定排班，
+    在「帮我排下周的班」上会编出 E001/E002 这类非法工号的 pins。
+    这些约束会悄悄改变排班结果，店长几乎不可能自己发现，所以拦截数必须能被看到。
+    """
+    triggered: bool = False
+    dropped_pins: int = 0
+    dropped_forbids: int = 0
+    dropped_excludes: int = 0
+    dropped_min_staff: int = 0
+    # 幻觉请假很罕见（说请假总会带上人），契约里没有对应计数位，只并入 summary 与 triggered
+    dropped_leaves: int = 0
+    invalid_employee_ids: List[str] = Field(default_factory=list)
+    summary: str = ""
+
+
 class ScheduleRequest(BaseModel):
     """LLM 意图解析的结构化输出，也是求解器的唯一输入。"""
     action: Literal["generate", "adjust", "unknown"] = "generate"
@@ -48,6 +67,9 @@ class ScheduleRequest(BaseModel):
     raw_text: str = ""
     parse_source: Literal["llm", "fallback_rule", "structured"] = "llm"
     parse_confidence: float = 1.0
+    # 降级到规则解析时为 None：那条路径根本没有模型参与，报一个模型名是误导
+    model_used: Optional[str] = None
+    guardrail: GuardrailStats = Field(default_factory=GuardrailStats)
 
 
 # ---------- 排班表 ----------
@@ -120,6 +142,37 @@ class Diagnosis(BaseModel):
     bottleneck_slots: List[str] = Field(default_factory=list)
     evidence: List[str] = Field(default_factory=list)
     unlock_options: List[UnlockOption] = Field(default_factory=list)
+
+
+# ---------- 排班表导入 ----------
+
+
+class UnresolvedToken(BaseModel):
+    """无法归一为合法工号的原始 token。
+
+    只记录、不猜测：员工档案里没有姓名字段，把「小王」映射成某个工号就是编造数据。
+    """
+    raw: str
+    where: str
+    reason: str
+
+
+class ImportExtraction(BaseModel):
+    """导入解析的中间产物：只负责「读出了什么」，合规与否交给 validator。"""
+    ok: bool = False
+    # .tsv 也归到 csv：契约给出的取值只有 csv / excel / image，多造一个值会让前端的
+    # 文案映射表落空，而「分隔符是什么」对使用者没有任何意义
+    source: Literal["csv", "excel", "image"]
+    extractor: Literal["deterministic", "vision_llm"]
+    layout: Literal["long", "matrix", "image", "unknown"] = "unknown"
+    model_used: Optional[str] = None
+    slots: List[Slot] = Field(default_factory=list)
+    assignments: int = 0
+    resolved: int = 0
+    unresolved: List[UnresolvedToken] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+    confidence: float = 0.0
+    requires_confirmation: bool = True
 
 
 # ---------- API ----------

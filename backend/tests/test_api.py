@@ -57,7 +57,9 @@ def test_generate_contract(generated):
     sm = r["solution"]["soft_metrics"]
     assert set(sm) == {"preference_rate", "balance_score", "skill_redundancy"}
     assert all(0 <= sm[k] <= 1 for k in sm), sm      # 三个指标必须是 0–1，前端直接画条
-    assert set(r["timing"]) == {"parse_ms", "solve_ms", "validate_ms", "explain_ms", "total_ms"}
+    # import_ms 在 generate 恒为 0，但字段必须常在（契约 v1.1），前端才不用做兼容判断
+    assert set(r["timing"]) == {"parse_ms", "solve_ms", "validate_ms", "explain_ms", "import_ms", "total_ms"}
+    assert r["timing"]["import_ms"] == 0
     assert len(r["validation"]["rules"]) == 9
     assert r["validation"]["passed"] and r["validation"]["violation_count"] == 0
     assert r["explanation"]["bullets"]

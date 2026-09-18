@@ -54,6 +54,27 @@
 
 外加**澄清态**：指令指代不明（如"小王明天来不了"）时反问，绝不猜。
 
+## 两个补充入口
+
+排班的起点常常不是空白，而是"手上已经有一张表"；模型也不该只有一个固定选项。所以补了两个入口：
+
+**导入已有排班表，一键体检**。拖进 CSV / Excel / 排班表图片，解析后立刻过同一套校验器，
+直接告诉店长这张表违了哪几条、哪个格子有问题。
+
+- CSV / Excel **完全不过 LLM**，纯确定性解析。长表（日期/班次/员工）和矩阵表（日期/早班/晚班）自动探测，
+  容忍列名别名、日期别名、班次简写、四种分隔符、小写工号与 `E1` 简写。
+- 图片走视觉模型（`glm-4v-flash`，清晰截图上实测 14/14 格全对），但 `requires_confirmation` 恒为 `true`，
+  **必须人工核对后才能应用为基线**。
+- 员工档案只有工号没有姓名，所以"小王"这类 token 一律进 `unresolved` 列出待人工处理，**不做模糊匹配**——
+  猜错一个人，后面所有校验结论都跟着错，且店长很难发现。
+- 解析结果先进预览，确认前不动现有看板。
+
+**模型可选**。文本模型影响意图解析与解释质量，视觉模型影响图片识别质量。清单里带上实测耗时与准确率，
+不可用的模型灰显并写明原因（余额不足 / 触发限流），付费模型充值后靠 `GLM_EXTRA_MODELS` 放开、不用改代码。
+
+选择器里顶着一句话说清边界：**模型只影响理解与表达，不影响排班正确性**。换模型不会让违规的排班变合规——
+这个边界不讲清楚，功能就会制造误解。
+
 ## 本地运行
 
 后端：
@@ -143,9 +164,16 @@ token 权限二选一：classic token 勾 `repo`；或 fine-grained token 设 Re
 | GET | `/api/health?deep=1` | 健康检查，`deep=1` 时实测 GLM 连通性 |
 | GET | `/api/meta` | 员工档案、9 条规则、班次定义（前端技能标签的唯一来源） |
 | GET | `/api/scenarios` | 5 个预置演示场景 |
-| POST | `/api/generate` | 主链路：`{instruction, base_slots}` → 方案 / 无解诊断 / 澄清 |
+| GET | `/api/models` | 可选文本/视觉模型清单（含实测耗时与准确率、不可用原因） |
+| POST | `/api/generate` | 主链路：`{instruction, base_slots, model?}` → 方案 / 无解诊断 / 澄清 |
 | POST | `/api/validate` | 手工微调后的实时校验，与生成路径共用校验器 |
 | GET | `/api/candidates` | 换人候选名单（已按 R-05/R-06/R-07/R-08 过滤） |
+| POST | `/api/import` | 导入已有排班表（CSV/TSV/Excel/图片），解析后立刻过同一个校验器体检 |
+| GET | `/api/import/template?fmt=csv` | 下载导入模板（示例内容取自求解器的零违规解） |
+
+模型选择只影响自然语言理解与解释质量：CSV/Excel 导入完全不过 LLM，排班合规性由求解器与
+校验器保证，换模型不会让违规的排班变合规。图片导入的识别结果 `requires_confirmation` 恒为
+`true`，必须人工核对后才能应用为基线。
 
 交互式文档：`/api/docs`。
 
@@ -159,11 +187,36 @@ backend/
   app/validator.py    L3 校验器（唯一真相源）
   app/repair.py       修复建议（自证有效后才返回）
   app/llm.py          L1/L4 GLM 接入 + 降级 + 防幻觉清洗
+  app/models_registry.py  可选模型白名单与实测数据（GLM_EXTRA_MODELS 可放开付费模型）
+  app/importer.py     排班表导入：CSV/Excel 确定性解析 + 图片视觉识别
   app/serializers.py  内部模型 → 前端契约
   app/main.py         FastAPI 路由
-  tests/              48 个测试
+  tests/              92 个测试
 frontend/             React 19 + TS + Vite + Tailwind
+  src/components/ModelPicker.tsx    模型选择器（含实测数据与能力边界说明）
+  src/components/ImportPanel.tsx    导入入口（拖拽 / 选择文件 / 下载模板）
+  src/components/ImportPreview.tsx  导入预览：确认后才替换看板
+  integration_check.py              真接口联调自检（Playwright，不用 mock）
+samples/              导入演示样例，预期结论由真实校验器断言过
 deploy/               Caddyfile + 服务器初始化 / 一键部署 / TLS 守护 / GitHub 发布脚本
+```
+
+### 导入演示样例
+
+`samples/` 下 5 个样例覆盖长表 / 矩阵表 / 违规表 / 脏数据 / 图片，每个的预期结论都由
+`samples/make_samples.py` 跑项目自己的校验器断言过，不是手写的。详见 [samples/README.md](samples/README.md)。
+
+最有信息量的是 `roster_long_violating.csv`：在合规解上只注入 3 处破坏，校验器却报出 5 条违规
+——多出来的是连带的 R-07。这就是「导入体检」的价值，人改排班时想不到的连带违规校验器会替你抓出来。
+
+### 联调自检
+
+前端 mock 只能证明 UI 不崩，证明不了两端字段对齐。真接口自检：
+
+```bash
+cd backend && python -m uvicorn app.main:app --port 8099 &
+cd frontend && VITE_API_TARGET=http://127.0.0.1:8099 npx vite --port 5199 &
+python frontend/integration_check.py   # 截图落在 /tmp/integration_shots
 ```
 
 ## 已知边界
@@ -171,3 +224,7 @@ deploy/               Caddyfile + 服务器初始化 / 一键部署 / TLS 守护
 - 求解时间预算 4s / 6 万节点。超时会明确返回"未在预算内找到可行解（未证明无解）"，与"已证明无解"严格区分。
 - 排班周期固定为一周 14 个班次，跨周连续工作天数（R-06）不跨周累计。
 - 软约束（偏好、均衡、兼职周末）只做局部优化，不保证全局最优；硬约束保证 100%。
+- 导入不做姓名映射（员工档案无姓名字段），不支持手写照片，不做导入历史版本管理。
+- `.xls`（旧 BIFF 格式）扩展名放行但解析会失败并提示"另存为 .xlsx"，未引入 `xlrd`。
+- 图片识别只在清晰截图上实测过；模糊、倾斜、手机翻拍的准确率未测，因此识别结果强制人工确认。
+- 模型清单的实测耗时与准确率是 2026-09-18 的探测值，非实时；付费模型放开后无实测数据，不带 `measured` 标记。

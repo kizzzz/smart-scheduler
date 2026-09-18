@@ -20,6 +20,8 @@ from .data import (
 )
 from .models import (
     Diagnosis,
+    GuardrailStats,
+    ImportExtraction,
     Schedule,
     ScheduleRequest,
     Slot,
@@ -202,6 +204,25 @@ def intent_out(intent: ScheduleRequest) -> dict:
         ],
         "degraded": degraded,
         "degrade_reason": reason,
+        "model_used": intent.model_used,
+        "guardrail": guardrail_out(intent.guardrail),
+    }
+
+
+def guardrail_out(g: GuardrailStats) -> dict:
+    """护栏统计的对外形态。
+
+    内部还有一个 dropped_leaves 计数，这里不外泄：契约没有这一位，而幻觉请假极罕见，
+    多给一个字段只会让前端多一条不知道该不该显示的分支——它已经并进 summary 了。
+    """
+    return {
+        "triggered": g.triggered,
+        "dropped_pins": g.dropped_pins,
+        "dropped_forbids": g.dropped_forbids,
+        "dropped_excludes": g.dropped_excludes,
+        "dropped_min_staff": g.dropped_min_staff,
+        "invalid_employee_ids": list(g.invalid_employee_ids),
+        "summary": g.summary,
     }
 
 
@@ -266,3 +287,45 @@ def diff_out(base: Optional[Schedule], new: Optional[Schedule], new_violations: 
                 "removed": sorted(before - after),
             })
     return {"changed_count": len(changed), "changed_slots": changed, "new_violations": new_violations}
+
+
+# ---------- 导入 ----------
+
+_EXPECTED_SLOTS = len(DAYS) * len(SHIFTS)
+
+# 解析失败时软指标一律给 0，而不是套用空排班算出来的值：空排班的班次标准差是 0，
+# 均衡度会算成满分 1.0，等于给一份读不出内容的表打了个漂亮分数
+_ZERO_SOFT = {"preference_rate": 0.0, "balance_score": 0.0, "skill_redundancy": 0.0}
+
+
+def import_out(
+    ex: ImportExtraction,
+    report: Optional[ValidationReport],
+    schedule: Optional[Schedule],
+    timing: Dict[str, int],
+) -> dict:
+    return {
+        "ok": ex.ok,
+        "source": ex.source,
+        "extractor": ex.extractor,
+        "model_used": ex.model_used,
+        "layout": ex.layout,
+        "slots": [
+            {"day": s.day, "shift": s.shift, "employees": list(s.employee_ids)} for s in ex.slots
+        ],
+        "stats": {
+            "slots_found": len(ex.slots),
+            "slots_expected": _EXPECTED_SLOTS,
+            "assignments": ex.assignments,
+            "resolved": ex.resolved,
+            "unresolved": len(ex.unresolved),
+        },
+        "unresolved": [u.model_dump() for u in ex.unresolved],
+        "warnings": ex.warnings,
+        "confidence": ex.confidence,
+        "requires_confirmation": ex.requires_confirmation,
+        # 与 /api/validate 完全同构：导入的体检结论必须和手工微调用同一套渲染与同一套标准
+        "validation": validation_out(report, schedule, None) if report else empty_validation(),
+        "soft_metrics": soft_metrics_out(report, schedule) if report else dict(_ZERO_SOFT),
+        "timing_ms": timing,
+    }

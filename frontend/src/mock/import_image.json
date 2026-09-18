@@ -1,0 +1,182 @@
+{
+  "ok": true,
+  "source": "image",
+  "extractor": "vision_llm",
+  "model_used": "glm-4v-flash",
+  "layout": "image",
+  "slots": [
+    {
+      "day": "一",
+      "shift": "早班",
+      "employees": [
+        "E01",
+        "E05",
+        "E06",
+        "E08"
+      ]
+    },
+    {
+      "day": "一",
+      "shift": "晚班",
+      "employees": [
+        "E02",
+        "E07",
+        "E09",
+        "E12",
+        "E16"
+      ]
+    },
+    {
+      "day": "二",
+      "shift": "早班",
+      "employees": [
+        "E03",
+        "E05",
+        "E06",
+        "E17",
+        "E20"
+      ]
+    },
+    {
+      "day": "二",
+      "shift": "晚班",
+      "employees": [
+        "E02",
+        "E07",
+        "E10",
+        "E12",
+        "E18"
+      ]
+    },
+    {
+      "day": "三",
+      "shift": "早班",
+      "employees": [
+        "E01",
+        "E06",
+        "E08",
+        "E11",
+        "E17"
+      ]
+    },
+    {
+      "day": "三",
+      "shift": "晚班",
+      "employees": [
+        "E04",
+        "E07",
+        "E09",
+        "E12",
+        "E16"
+      ]
+    },
+    {
+      "day": "四",
+      "shift": "早班",
+      "employees": [
+        "E03",
+        "E05",
+        "E11",
+        "E17",
+        "E20"
+      ]
+    },
+    {
+      "day": "四",
+      "shift": "晚班",
+      "employees": [
+        "E02",
+        "E07",
+        "E10",
+        "E12",
+        "E18"
+      ]
+    },
+    {
+      "day": "五",
+      "shift": "早班",
+      "employees": [
+        "E04",
+        "E08",
+        "E11",
+        "E17",
+        "E20"
+      ]
+    },
+    {
+      "day": "五",
+      "shift": "晚班",
+      "employees": [
+        "E02",
+        "E06",
+        "E09",
+        "E12",
+        "E14"
+      ]
+    },
+    {
+      "day": "六",
+      "shift": "早班",
+      "employees": [
+        "E01",
+        "E10",
+        "E13",
+        "E15",
+        "E16",
+        "E17"
+      ]
+    },
+    {
+      "day": "六",
+      "shift": "晚班",
+      "employees": [
+        "E03",
+        "E08",
+        "E11",
+        "E14",
+        "E19"
+      ]
+    },
+    {
+      "day": "日",
+      "shift": "早班",
+      "employees": [
+        "E04",
+        "E10",
+        "E13",
+        "E15",
+        "E16",
+        "E18"
+      ]
+    }
+  ],
+  "stats": {
+    "slots_found": 13,
+    "slots_expected": 14,
+    "assignments": 68,
+    "resolved": 66,
+    "unresolved": 2
+  },
+  "unresolved": [
+    {
+      "raw": "小王",
+      "where": "周一早班",
+      "reason": "不是合法工号（员工档案只有 E01–E20，且无姓名字段）"
+    },
+    {
+      "raw": "E30",
+      "where": "周六晚班",
+      "reason": "工号超出 E01–E20 范围"
+    }
+  ],
+  "warnings": [
+    "周日晚班一格因表格线断裂未能识别，已跳过；请核对后手工补齐"
+  ],
+  "confidence": 0.89,
+  "requires_confirmation": true,
+  "timing_ms": {
+    "extract_ms": 9860,
+    "validate_ms": 3,
+    "total_ms": 9863
+  }
+}

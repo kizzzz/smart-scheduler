@@ -2,3 +2,7 @@ fastapi>=0.115,<0.120
 uvicorn[standard]>=0.30,<0.35
 httpx>=0.27,<0.29
 pydantic>=2.9,<3
+# /api/import 用 multipart/form-data 收文件，FastAPI 缺这个依赖会直接报 500
+python-multipart>=0.0.9,<0.1
+# Excel(.xlsx) 导入；.xls 旧格式 openpyxl 不支持，接口会给出「另存为 .xlsx」提示
+openpyxl>=3.1,<4

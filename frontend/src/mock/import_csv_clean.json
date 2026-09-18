@@ -1,0 +1,183 @@
+{
+  "ok": true,
+  "source": "csv",
+  "extractor": "deterministic",
+  "model_used": null,
+  "layout": "long",
+  "slots": [
+    {
+      "day": "一",
+      "shift": "早班",
+      "employees": [
+        "E01",
+        "E05",
+        "E06",
+        "E08",
+        "E11"
+      ]
+    },
+    {
+      "day": "一",
+      "shift": "晚班",
+      "employees": [
+        "E02",
+        "E07",
+        "E09",
+        "E12",
+        "E16"
+      ]
+    },
+    {
+      "day": "二",
+      "shift": "早班",
+      "employees": [
+        "E03",
+        "E05",
+        "E06",
+        "E17",
+        "E20"
+      ]
+    },
+    {
+      "day": "二",
+      "shift": "晚班",
+      "employees": [
+        "E02",
+        "E07",
+        "E10",
+        "E12",
+        "E18"
+      ]
+    },
+    {
+      "day": "三",
+      "shift": "早班",
+      "employees": [
+        "E01",
+        "E06",
+        "E08",
+        "E11",
+        "E17"
+      ]
+    },
+    {
+      "day": "三",
+      "shift": "晚班",
+      "employees": [
+        "E04",
+        "E07",
+        "E09",
+        "E12",
+        "E16"
+      ]
+    },
+    {
+      "day": "四",
+      "shift": "早班",
+      "employees": [
+        "E03",
+        "E05",
+        "E11",
+        "E17",
+        "E20"
+      ]
+    },
+    {
+      "day": "四",
+      "shift": "晚班",
+      "employees": [
+        "E02",
+        "E07",
+        "E10",
+        "E12",
+        "E18"
+      ]
+    },
+    {
+      "day": "五",
+      "shift": "早班",
+      "employees": [
+        "E04",
+        "E08",
+        "E11",
+        "E17",
+        "E20"
+      ]
+    },
+    {
+      "day": "五",
+      "shift": "晚班",
+      "employees": [
+        "E02",
+        "E06",
+        "E09",
+        "E12",
+        "E14"
+      ]
+    },
+    {
+      "day": "六",
+      "shift": "早班",
+      "employees": [
+        "E01",
+        "E10",
+        "E13",
+        "E15",
+        "E16",
+        "E17"
+      ]
+    },
+    {
+      "day": "六",
+      "shift": "晚班",
+      "employees": [
+        "E03",
+        "E08",
+        "E11",
+        "E14",
+        "E19",
+        "E20"
+      ]
+    },
+    {
+      "day": "日",
+      "shift": "早班",
+      "employees": [
+        "E04",
+        "E10",
+        "E13",
+        "E15",
+        "E16",
+        "E18"
+      ]
+    },
+    {
+      "day": "日",
+      "shift": "晚班",
+      "employees": [
+        "E02",
+        "E06",
+        "E07",
+        "E09",
+        "E14",
+        "E19"
+      ]
+    }
+  ],
+  "stats": {
+    "slots_found": 14,
+    "slots_expected": 14,
+    "assignments": 74,
+    "resolved": 74,
+    "unresolved": 0
+  },
+  "unresolved": [],
+  "warnings": [],
+  "confidence": 1.0,
+  "requires_confirmation": false,
+  "timing_ms": {
+    "extract_ms": 12,
+    "validate_ms": 2,
+    "total_ms": 14
+  }
+}

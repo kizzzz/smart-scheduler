@@ -1,7 +1,32 @@
-import type { IntentChip, Meta, Slot, Validation } from '../types';
+import type { ImportedSlot, IntentChip, Meta, Slot, Validation } from '../types';
 import { slotKey } from './utils';
 
 export const SKILL_MANAGER = '店长值守';
+
+/**
+ * 把 `/api/import` 的精简格子补成看板 / base_slots 需要的完整 Slot。
+ * day_label、shift_time、min_required 一律取自 `/api/meta`，不从导入文件里猜；
+ * meta 里不存在的 day/shift 组合直接丢弃，避免脏数据把看板撑歪。
+ */
+export function normalizeImportedSlots(meta: Meta, imported: ImportedSlot[]): Slot[] {
+  const bySlot = new Map(imported.map((s) => [slotKey(s.day, s.shift), s]));
+  const out: Slot[] = [];
+  for (const day of meta.days) {
+    for (const shift of meta.shifts) {
+      const hit = bySlot.get(slotKey(day.key, shift.key));
+      if (!hit) continue;
+      out.push({
+        day: day.key,
+        day_label: day.label,
+        shift: shift.key,
+        shift_time: shift.time,
+        min_required: day.min_required,
+        employees: [...hit.employees].sort(),
+      });
+    }
+  }
+  return out;
+}
 
 /** 该班次的候选人员：当日可工作、未请假、未在当天另一班次、且不在本班次内 */
 export function candidatesForSlot(

@@ -1,6 +1,7 @@
 /**
  * 后端 API 契约类型定义。
- * 字段名严格对齐 `GET /api/meta`、`POST /api/generate`、`POST /api/validate`、`GET /api/scenarios`。
+ * 字段名严格对齐 `GET /api/meta`、`GET /api/models`、`POST /api/generate`、
+ * `POST /api/validate`、`POST /api/import`、`GET /api/scenarios`。
  * 请勿重命名字段，前端内部派生状态请使用本文件末尾的「视图层类型」。
  */
 
@@ -43,6 +44,48 @@ export interface Meta {
   shifts: ShiftMeta[];
 }
 
+/* ---------------- GET /api/models ---------------- */
+
+/**
+ * 实测数据。后端只在真的探测过时才给这个字段，所以每一项都是可选的：
+ * 文本模型给 `hallucinated_cases`，视觉模型给 `cell_accuracy`。
+ */
+export interface ModelMeasured {
+  avg_latency_s?: number;
+  hallucinated_cases?: string;
+  cell_accuracy?: string;
+  probed_at?: string;
+}
+
+/** `latency_hint` / `accuracy_hint` / `note` 由后端负责措辞，前端只展示不拼装 */
+export interface ModelOption {
+  id: string;
+  label: string;
+  tier: 'free' | 'paid' | string;
+  is_default: boolean;
+  latency_hint: string;
+  accuracy_hint: string;
+  note: string;
+  max_output_tokens?: number;
+  measured?: ModelMeasured;
+}
+
+/** 探测到但当前 Key 不可用的模型：灰显 + 给出 reason，比直接隐藏更能解释「为什么不能选」 */
+export interface LockedModel {
+  id: string;
+  reason: string;
+}
+
+export interface ModelCatalog {
+  default_text: string;
+  default_vision: string;
+  text: ModelOption[];
+  vision: ModelOption[];
+  locked: LockedModel[];
+  boundary_note: string;
+  unlock_note: string;
+}
+
 /* ---------------- GET /api/scenarios ---------------- */
 
 export interface Scenario {
@@ -69,6 +112,20 @@ export interface TempConstraint {
   raw: string;
 }
 
+/**
+ * 反幻觉护栏的拦截结果。`triggered=false` 时各计数为 0、`summary` 为空串。
+ * summary 由后端生成中文，前端直接显示——这是「LLM 会编造但被确定性护栏拦住」的可见证据。
+ */
+export interface Guardrail {
+  triggered: boolean;
+  dropped_pins: number;
+  dropped_forbids: number;
+  dropped_excludes: number;
+  dropped_min_staff: number;
+  invalid_employee_ids: string[];
+  summary: string;
+}
+
 export interface Intent {
   operation: string;
   period_label: string;
@@ -77,6 +134,12 @@ export interface Intent {
   temp_constraints: TempConstraint[];
   degraded: boolean;
   degrade_reason: string | null;
+  /**
+   * 本次实际使用的文本模型；降级到规则解析时为 `null`。
+   * 声明为可选是为了兼容尚未升级到 v1.1 的线上后端，避免旧响应把界面打空。
+   */
+  model_used?: string | null;
+  guardrail?: Guardrail | null;
 }
 
 export interface Slot {
@@ -175,12 +238,16 @@ export interface Timing {
   solve_ms: number;
   validate_ms: number;
   explain_ms: number;
+  /** 导入链路耗时，generate 恒为 0；可选是为兼容未升级到 v1.1 的线上后端 */
+  import_ms?: number;
   total_ms: number;
 }
 
 export interface GenerateRequest {
   instruction: string;
   base_slots: Slot[] | null;
+  /** 省略或 null 时后端使用 default_text；不在白名单会返回 400 */
+  model?: string | null;
 }
 
 export interface GenerateResponse {
@@ -207,10 +274,73 @@ export interface ValidateResponse {
   soft_metrics: SoftMetrics;
 }
 
+/* ---------------- POST /api/import ---------------- */
+
+/**
+ * 导入解析出的格子。契约只保证 day / shift / employees 三个字段，
+ * 看板需要的 day_label / shift_time / min_required 由前端按 `/api/meta` 补全
+ * （见 lib/schedule.ts 的 normalizeImportedSlots），所以这里声明为可选。
+ */
+export interface ImportedSlot {
+  day: string;
+  shift: string;
+  employees: string[];
+  day_label?: string;
+  shift_time?: string;
+  min_required?: number;
+}
+
+export interface ImportStats {
+  slots_found: number;
+  slots_expected: number;
+  assignments: number;
+  resolved: number;
+  unresolved: number;
+}
+
+/** 无法归一为合法工号的 token：只报不猜（员工档案没有姓名字段） */
+export interface UnresolvedItem {
+  raw: string;
+  where: string;
+  reason: string;
+}
+
+export interface ImportTiming {
+  extract_ms: number;
+  validate_ms: number;
+  total_ms: number;
+}
+
+export interface ImportResponse {
+  /** 完全读不出班次时后端仍返回 HTTP 200，用 ok=false + warnings 说明原因 */
+  ok: boolean;
+  source: 'csv' | 'excel' | 'image' | string;
+  /** deterministic：CSV/Excel 不过 LLM；vision_llm：图片识别，结果需人工核对 */
+  extractor: 'deterministic' | 'vision_llm' | string;
+  model_used: string | null;
+  layout: 'long' | 'matrix' | 'image' | string;
+  slots: ImportedSlot[];
+  /** 解析失败（ok=false）时后端可能不给统计与体检结果，故为可选 */
+  stats?: ImportStats;
+  unresolved?: UnresolvedItem[];
+  warnings?: string[];
+  confidence: number;
+  requires_confirmation: boolean;
+  validation?: Validation | null;
+  soft_metrics?: SoftMetrics | null;
+  timing_ms?: ImportTiming;
+}
+
 /* ---------------- 视图层类型 ---------------- */
 
 /** 求解进度阶段，用于加载态轮换文案 */
 export type SolvePhase = 'parse' | 'solve' | 'validate' | 'explain';
+
+/**
+ * 导入文件的体感分类：表格是毫秒级、图片要走视觉模型约 10 秒，
+ * 两者的等待体验差一个数量级，loading 文案必须区分。
+ */
+export type ImportKind = 'sheet' | 'image';
 
 /** 统一错误信息：网络失败 / 5xx / 后端 message */
 export interface ApiFailure {

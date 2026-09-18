@@ -1,4 +1,4 @@
-import { CalendarPlus, MousePointerClick, ShieldCheck, Sparkles } from 'lucide-react';
+import { CalendarPlus, FileUp, MousePointerClick, ShieldCheck, Sparkles } from 'lucide-react';
 import { Card } from './ui/Card';
 
 const EXAMPLES = [
@@ -49,11 +49,12 @@ export function EmptyBoard({ onPick }: { onPick: (text: string) => void }) {
           ))}
         </div>
 
-        <div className="mt-5 grid gap-3 border-t border-line-2 pt-4 text-left sm:grid-cols-3">
+        <div className="mt-5 grid gap-3 border-t border-line-2 pt-4 text-left sm:grid-cols-2 lg:grid-cols-4">
           {[
             { icon: <CalendarPlus size={13} />, t: '0→80 草案', d: '7 天 × 2 班次一次成型' },
             { icon: <ShieldCheck size={13} />, t: '9 条硬规则', d: '独立校验器兜底，零违规' },
             { icon: <MousePointerClick size={13} />, t: '点击换人', d: '微调即时校验，不做拖拽' },
+            { icon: <FileUp size={13} />, t: '导入体检', d: '已有排班表拖进来查违规' },
           ].map((x) => (
             <div key={x.t} className="rounded-lg border border-line bg-soft px-3 py-2">
               <p className="flex items-center gap-1.5 text-[12px] font-semibold text-ink-2">

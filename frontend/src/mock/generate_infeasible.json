@@ -52,7 +52,17 @@
       }
     ],
     "degraded": false,
-    "degrade_reason": null
+    "degrade_reason": null,
+    "model_used": "glm-4-flash",
+    "guardrail": {
+      "triggered": false,
+      "dropped_pins": 0,
+      "dropped_forbids": 0,
+      "dropped_excludes": 0,
+      "dropped_min_staff": 0,
+      "invalid_employee_ids": [],
+      "summary": ""
+    }
   },
   "solution": null,
   "validation": {
@@ -104,6 +114,7 @@
     "solve_ms": 2400,
     "validate_ms": 0,
     "explain_ms": 1450,
+    "import_ms": 0,
     "total_ms": 4760
   }
 }

@@ -27,7 +27,19 @@
     ],
     "temp_constraints": [],
     "degraded": false,
-    "degrade_reason": null
+    "degrade_reason": null,
+    "model_used": "glm-4-flash",
+    "guardrail": {
+      "triggered": true,
+      "dropped_pins": 1,
+      "dropped_forbids": 0,
+      "dropped_excludes": 0,
+      "dropped_min_staff": 1,
+      "invalid_employee_ids": [
+        "E001"
+      ],
+      "summary": "已丢弃 2 条模型自造约束：1 条固定排班、1 条无效人数下限"
+    }
   },
   "solution": {
     "found": true,
@@ -321,6 +333,7 @@
     "solve_ms": 140,
     "validate_ms": 3,
     "explain_ms": 1900,
+    "import_ms": 0,
     "total_ms": 2863
   }
 }

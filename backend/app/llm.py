@@ -14,9 +14,11 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 
+from . import models_registry
 from .data import DAYS, EMPLOYEE_IDS, EMPLOYEES, MIN_PER_SHIFT_WEEKDAY, RULES, SHIFTS, min_required
 from .models import (
     Diagnosis,
+    GuardrailStats,
     Schedule,
     ScheduleRequest,
     ValidationReport,
@@ -28,6 +30,8 @@ GLM_TIMEOUT = float(os.getenv("GLM_TIMEOUT", "12"))
 # 只认显式配置的代理：不继承环境变量，避免宿主机 NO_PROXY/CIDR 之类的脏配置把出网打挂
 GLM_PROXY = os.getenv("GLM_PROXY") or None
 GLM_RETRIES = int(os.getenv("GLM_RETRIES", "2"))
+# 视觉识别比意图解析慢一倍（实测 ~10s），沿用文本超时会稳定超时
+GLM_VISION_TIMEOUT = float(os.getenv("GLM_VISION_TIMEOUT", "40"))
 
 
 def api_key() -> str:
@@ -38,12 +42,23 @@ def llm_enabled() -> bool:
     return bool(api_key())
 
 
-async def _chat(messages: List[Dict[str, str]], *, temperature: float, json_mode: bool, max_tokens: int) -> str:
+async def _chat(
+    messages: List[Dict[str, Any]],
+    *,
+    temperature: float,
+    json_mode: bool,
+    max_tokens: int,
+    model: Optional[str] = None,
+    timeout: Optional[float] = None,
+) -> str:
+    # model 省略时沿用模块级默认，保证老调用方行为逐字不变
+    used = model or GLM_MODEL
     payload: Dict[str, Any] = {
-        "model": GLM_MODEL,
+        "model": used,
         "messages": messages,
+        # 按模型自身上限夹取：glm-4v-flash 传超过 1024 会整体 1210 参数非法，一格都读不出来
+        "max_tokens": models_registry.clamp_max_tokens(used, max_tokens),
         "temperature": temperature,
-        "max_tokens": max_tokens,
     }
     if json_mode:
         payload["response_format"] = {"type": "json_object"}
@@ -51,7 +66,9 @@ async def _chat(messages: List[Dict[str, str]], *, temperature: float, json_mode
     last: Exception | None = None
     for attempt in range(GLM_RETRIES + 1):
         try:
-            async with httpx.AsyncClient(timeout=GLM_TIMEOUT, trust_env=False, proxy=GLM_PROXY) as client:
+            async with httpx.AsyncClient(
+                timeout=timeout or GLM_TIMEOUT, trust_env=False, proxy=GLM_PROXY
+            ) as client:
                 r = await client.post(f"{GLM_BASE_URL}/chat/completions", json=payload, headers=headers)
                 r.raise_for_status()
                 data = r.json()
@@ -151,20 +168,77 @@ def mentioned_employee_ids(text: str) -> set[str]:
     return found
 
 
-def _sanitize(raw: dict, text: str, source: str) -> ScheduleRequest:
+_GUARD_LABELS = (
+    ("pins", "固定排班"),
+    ("forbids", "禁止排班"),
+    ("excludes", "整周排除"),
+    ("min_staff", "无效人数下限"),
+    ("leaves", "临时请假"),
+)
+
+
+def _guardrail(counts: Dict[str, int], invalid_ids: List[str]) -> GuardrailStats:
+    """把拦截计数折成前端可直接显示的一句中文。
+
+    措辞由后端定，前端不拼字符串——同一件事在两端各写一遍文案，早晚会说成两个意思。
+    """
+    parts = [f"{counts[k]} 条{label}" for k, label in _GUARD_LABELS if counts.get(k)]
+    total = sum(counts.get(k, 0) for k, _ in _GUARD_LABELS)
+    triggered = bool(total or invalid_ids)
+    summary = ""
+    if total:
+        summary = f"已丢弃 {total} 条模型自造约束：" + "、".join(parts)
+    elif triggered:
+        # 兜底以维持不变式「triggered 为真 ⇒ summary 非空」：前端只会显示 summary，
+        # 一个亮着灯却没有文案的护栏比不亮更糟
+        summary = "已丢弃模型给出的非法工号：" + "、".join(invalid_ids)
+    return GuardrailStats(
+        triggered=triggered,
+        dropped_pins=counts.get("pins", 0),
+        dropped_forbids=counts.get("forbids", 0),
+        dropped_excludes=counts.get("excludes", 0),
+        dropped_min_staff=counts.get("min_staff", 0),
+        dropped_leaves=counts.get("leaves", 0),
+        invalid_employee_ids=invalid_ids,
+        summary=summary,
+    )
+
+
+def _appears_verbatim(token: str, text: str) -> bool:
+    """指令原文里是否真出现过这个 token（全角折半、忽略大小写）。
+
+    用来区分两种「非法工号」：店长自己写错了（E99 请假）要反问；模型凭空编出来的
+    （实测「帮我排下周的班」会被补出 E001/E002 的 pins）只能静默丢弃——
+    拿一个用户从没提过的工号去反问，只会让人怀疑系统坏了。
+    """
+    flat = (text or "").translate(_FULLWIDTH_DIGITS).lower()
+    return token.strip().lower() in flat
+
+
+def _sanitize(raw: dict, text: str, source: str, model: Optional[str] = None) -> ScheduleRequest:
     """对模型输出做确定性清洗：非法员工/日期/班次一律丢弃并转为澄清项。"""
     problems: List[str] = []
     dropped: List[str] = []
     mentioned = mentioned_employee_ids(text)
+    # 按约束种类分桶计数，才能在前端说清「丢的是固定排班还是人数下限」
+    counts: Dict[str, int] = {}
+    invalid_ids: List[str] = []
 
-    def ok_emp(eid: Any) -> bool:
+    def ok_emp(eid: Any, bucket: str) -> bool:
         if not (isinstance(eid, str) and eid in EMPLOYEE_IDS):
+            counts[bucket] = counts.get(bucket, 0) + 1
+            if isinstance(eid, str) and eid.strip():
+                invalid_ids.append(eid.strip())
+                if not _appears_verbatim(eid, text):
+                    dropped.append(eid.strip())
+                    return False
             problems.append(f"指令中的「{eid}」无法对应到员工数据中的任何 ID，请确认具体是谁")
             return False
         # 反幻觉：ID 合法但原文根本没提这个人，视为模型编造，静默丢弃。
         # 不转成澄清问题——就指令里不存在的人反问店长只会造成困惑。
         if eid not in mentioned:
             dropped.append(eid)
+            counts[bucket] = counts.get(bucket, 0) + 1
             return False
         return True
 
@@ -173,7 +247,7 @@ def _sanitize(raw: dict, text: str, source: str) -> ScheduleRequest:
 
     temp_leaves = []
     for tl in raw.get("temp_leaves") or []:
-        if not isinstance(tl, dict) or not ok_emp(tl.get("employee_id")):
+        if not isinstance(tl, dict) or not ok_emp(tl.get("employee_id"), "leaves"):
             continue
         days = [d for d in (tl.get("days") or []) if ok_day(d)]
         if not days:
@@ -183,7 +257,7 @@ def _sanitize(raw: dict, text: str, source: str) -> ScheduleRequest:
 
     pins = []
     for p in raw.get("pins") or []:
-        if not isinstance(p, dict) or not ok_emp(p.get("employee_id")):
+        if not isinstance(p, dict) or not ok_emp(p.get("employee_id"), "pins"):
             continue
         if ok_day(p.get("day")) and p.get("shift") in _VALID_SHIFTS:
             pins.append({"employee_id": p["employee_id"], "day": p["day"], "shift": p["shift"]})
@@ -192,17 +266,23 @@ def _sanitize(raw: dict, text: str, source: str) -> ScheduleRequest:
 
     forbids = []
     for f in raw.get("forbids") or []:
-        if not isinstance(f, dict) or not ok_emp(f.get("employee_id")):
+        if not isinstance(f, dict) or not ok_emp(f.get("employee_id"), "forbids"):
             continue
         if ok_day(f.get("day")):
             sh = f.get("shift") if f.get("shift") in _VALID_SHIFTS else None
             forbids.append({"employee_id": f["employee_id"], "day": f["day"], "shift": sh})
 
-    excludes = [
-        e
-        for e in (raw.get("exclude_employees") or [])
-        if isinstance(e, str) and e in EMPLOYEE_IDS and e in mentioned
-    ]
+    excludes = []
+    for e in raw.get("exclude_employees") or []:
+        if isinstance(e, str) and e in EMPLOYEE_IDS and e in mentioned:
+            excludes.append(e)
+            continue
+        # 整周排除的代价最大（直接抽走一个人的全部班），编造的一律丢，且不反问
+        counts["excludes"] = counts.get("excludes", 0) + 1
+        if isinstance(e, str) and e.strip() and e not in EMPLOYEE_IDS:
+            invalid_ids.append(e.strip())
+        elif isinstance(e, str):
+            dropped.append(e)
 
     prefs = []
     for sp in raw.get("soft_preferences") or []:
@@ -229,6 +309,7 @@ def _sanitize(raw: dict, text: str, source: str) -> ScheduleRequest:
         baseline = MIN_PER_SHIFT_WEEKDAY if day_of == "all" else min_required(day_of)
         if iv <= baseline:
             dropped.append(f"min_staff_override:{k}={iv}")
+            counts["min_staff"] = counts.get("min_staff", 0) + 1
             continue
         overrides[k] = iv
 
@@ -255,6 +336,8 @@ def _sanitize(raw: dict, text: str, source: str) -> ScheduleRequest:
         raw_text=text,
         parse_source=source,  # type: ignore[arg-type]
         parse_confidence=0.9 if source == "llm" else 0.5,
+        model_used=model if source == "llm" else None,
+        guardrail=_guardrail(counts, list(dict.fromkeys(invalid_ids))),
     )
 
 
@@ -302,22 +385,25 @@ def fallback_parse(text: str) -> ScheduleRequest:
     return _sanitize(raw, text, "fallback_rule")
 
 
-async def parse_intent(text: str) -> ScheduleRequest:
+async def parse_intent(text: str, model: Optional[str] = None) -> ScheduleRequest:
+    """model 省略时用模块默认模型，行为与加入模型选择前完全一致。"""
     if not text.strip():
         return ScheduleRequest(action="generate", raw_text="", parse_source="structured", parse_confidence=1.0)
     if not llm_enabled():
         return fallback_parse(text)
+    used = model or GLM_MODEL
     try:
         content = await _chat(
             [{"role": "system", "content": _INTENT_SYSTEM}, {"role": "user", "content": text}],
             temperature=0.05,
             json_mode=True,
             max_tokens=900,
+            model=used,
         )
         raw = _extract_json(content)
         if raw is None:
             return fallback_parse(text)
-        return _sanitize(raw, text, "llm")
+        return _sanitize(raw, text, "llm", model=used)
     except Exception:
         return fallback_parse(text)
 
@@ -442,6 +528,7 @@ async def explain(
     report: Optional[ValidationReport],
     intent: ScheduleRequest,
     diagnosis: Diagnosis,
+    model: Optional[str] = None,
 ) -> tuple[str, str]:
     fallback = template_explanation(report, intent, diagnosis)
     if not llm_enabled():
@@ -455,6 +542,7 @@ async def explain(
             temperature=0.3,
             json_mode=False,
             max_tokens=600,
+            model=model or GLM_MODEL,
         )
         cleaned = _clean_explanation(content, report, diagnosis)
         if cleaned is None:
@@ -462,6 +550,59 @@ async def explain(
         return cleaned, "llm"
     except Exception:
         return fallback, "template"
+
+
+# ---------- 图片排班表识别（导入链路专用） ----------
+
+# 这段 prompt 是实测调出来的，改动前请重新验一遍：glm-4v-flash 在 1100×620 清晰排班表上
+# 做到 14/14 格、64/64 人次、0 误报。三处细节是关键：
+# 1. 明确「看不清就填 []，不要凭常识补人」——否则模型会拿常见排班习惯补齐空格；
+# 2. 明确「一共 14 个格子」，给模型一个自检锚点；
+# 3. 明确禁 markdown，虽然仍要靠 _extract_json 兜底。
+_VISION_PROMPT = """你是排班表识别器。图中是一张门店周排班表，行=日期（周一到周日），列=早班/晚班，单元格里是员工工号（形如 E01）。
+
+只输出 JSON，不要任何解释、不要 markdown 代码块。格式：
+{"rows":[{"day":"一","shift":"早班","employees":["E01","E06"]}]}
+
+要求：
+- day 只能是 一 二 三 四 五 六 日 之一
+- shift 只能是 早班 或 晚班
+- employees 只填你在图中确实看清的工号，保持 E + 两位数字 格式
+- 看不清的格子照样输出该格，employees 填 []，不要凭常识补人
+- 一共应该有 14 个格子"""
+
+
+async def read_schedule_image(data_url: str, model: Optional[str] = None) -> tuple[List[dict], str]:
+    """把排班表图片交给视觉模型读成 rows，返回 (rows, 实际使用的模型)。
+
+    这里只做「取回模型说了什么」，工号归一、非法 token、体检全部由 importer/validator
+    接手——视觉模型的输出和 CSV 的原始 token 一样不可信，必须走同一条确定性管道。
+
+    不用 response_format=json_object：视觉模型不保证支持该参数，实测更稳的做法是
+    prompt 里禁 markdown + `_extract_json` 兜底。
+    """
+    used = model or models_registry.DEFAULT_VISION_MODEL
+    content = await _chat(
+        [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": _VISION_PROMPT},
+                    {"type": "image_url", "image_url": {"url": data_url}},
+                ],
+            }
+        ],
+        temperature=0.0,
+        json_mode=False,
+        # 夹取在 _chat 里做，这里写理想值：glm-4v-flash 会被压到 1024
+        max_tokens=2048,
+        model=used,
+        timeout=GLM_VISION_TIMEOUT,
+    )
+    raw = _extract_json(content)
+    if not isinstance(raw, dict) or not isinstance(raw.get("rows"), list):
+        raise ValueError("视觉模型未返回可解析的 JSON")
+    return [r for r in raw["rows"] if isinstance(r, dict)], used
 
 
 async def health() -> dict:
