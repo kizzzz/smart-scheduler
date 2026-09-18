@@ -110,9 +110,10 @@ class _FakeClient:
     """记录最后一次请求体，用来断言我们到底给上游发了什么。"""
 
     last_payload: dict = {}
+    last_timeout: float | None = None
 
     def __init__(self, **kwargs):
-        pass
+        _FakeClient.last_timeout = kwargs.get("timeout")
 
     async def __aenter__(self):
         return self
@@ -172,3 +173,66 @@ def test_vision_call_uses_default_vision_model(captured, monkeypatch):
     # 图片必须以 image_url 形式传，且不能带 response_format（视觉模型不保证支持）
     assert captured.last_payload["messages"][0]["content"][1]["type"] == "image_url"
     assert "response_format" not in captured.last_payload
+
+
+# ---------- 慢模型的超时预算 ----------
+#
+# 这组测试来自一次线上实测事故：glm-4.5-flash 实测 ~30s，而 GLM_TIMEOUT 默认 12s，
+# 结果用户在界面上选了「最准」的模型，后端每次都超时并静默降级成规则解析——
+# 他拿到的解析质量比默认模型更差，而界面上没有任何提示。
+
+
+def test_timeout_scales_with_measured_latency():
+    """慢模型必须拿到更宽的超时预算，否则这个选项永远无法生效。"""
+    assert models_registry.timeout_for("glm-4.5-flash", 12.0) == pytest.approx(75.25)
+    # 快模型不该被无故放宽：3.7 * 2.5 = 9.25 < 12，取 base
+    assert models_registry.timeout_for("glm-4-flash-250414", 12.0) == 12.0
+    # 未登记的模型（GLM_EXTRA_MODELS 放开的付费模型）没有实测数据，保持 base
+    assert models_registry.timeout_for("glm-4-plus", 12.0) == 12.0
+    assert models_registry.timeout_for(None, 12.0) == 12.0
+
+
+def test_chat_uses_model_specific_timeout(captured):
+    _chat(model="glm-4.5-flash")
+    assert captured.last_timeout == pytest.approx(75.25)
+    _chat(model="glm-4-flash-250414")
+    assert captured.last_timeout == pytest.approx(llm.GLM_TIMEOUT)
+
+
+def test_chat_does_not_retry_on_timeout(monkeypatch):
+    """超时已经等满整个预算，重试只会把等待翻三倍：75s 的模型会拖成 225s。"""
+    calls = {"n": 0}
+
+    class _TimeoutClient(_FakeClient):
+        async def post(self, url, json=None, headers=None):
+            calls["n"] += 1
+            raise llm.httpx.ConnectTimeout("timeout")
+
+    monkeypatch.setattr(llm.httpx, "AsyncClient", _TimeoutClient)
+    monkeypatch.setenv("GLM_API_KEY", "test-key")
+    with pytest.raises(llm.httpx.TimeoutException):
+        _chat(model="glm-4.5-flash")
+    assert calls["n"] == 1, "超时不应重试"
+
+
+def test_chat_still_retries_on_connection_error(monkeypatch):
+    """网络抖动（非超时）仍然要重试，否则一次瞬时抖动就整体降级。"""
+    calls = {"n": 0}
+
+    class _FlakyClient(_FakeClient):
+        async def post(self, url, json=None, headers=None):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise llm.httpx.ConnectError("reset")
+            _FakeClient.last_payload = json or {}
+            return _FakeResponse()
+
+    monkeypatch.setattr(llm.httpx, "AsyncClient", _FlakyClient)
+    monkeypatch.setenv("GLM_API_KEY", "test-key")
+    monkeypatch.setattr(llm.asyncio, "sleep", _noop_sleep)
+    _chat()
+    assert calls["n"] == 2
+
+
+async def _noop_sleep(_seconds):
+    return None

@@ -7,13 +7,14 @@
       "label": "GLM-4-Flash",
       "tier": "free",
       "is_default": true,
-      "latency_hint": "约 4–8 秒",
+      "latency_hint": "整体约 10 秒",
       "accuracy_hint": "均衡",
       "note": "默认。实测偶发编造未提及员工的约束，已被护栏拦截",
       "measured": {
         "avg_latency_s": 8.3,
         "hallucinated_cases": "2/3",
-        "probed_at": "2026-09-18"
+        "probed_at": "2026-09-18",
+        "e2e_latency_s": 9.6
       }
     },
     {
@@ -21,13 +22,14 @@
       "label": "GLM-4-Flash-250414",
       "tier": "free",
       "is_default": false,
-      "latency_hint": "约 4 秒（最快）",
+      "latency_hint": "整体约 6 秒（最快）",
       "accuracy_hint": "偏快，编造较多",
       "note": "响应最快，但实测 3 个 case 里 2 个编造了指令未提及的员工约束",
       "measured": {
         "avg_latency_s": 3.7,
         "hallucinated_cases": "2/3",
-        "probed_at": "2026-09-18"
+        "probed_at": "2026-09-18",
+        "e2e_latency_s": 5.6
       }
     },
     {
@@ -35,13 +37,14 @@
       "label": "GLM-4.5-Flash",
       "tier": "free",
       "is_default": false,
-      "latency_hint": "约 30 秒（最慢）",
+      "latency_hint": "整体约 50 秒（很慢）",
       "accuracy_hint": "最准，零编造",
-      "note": "实测 3 个 case 全部正确、无编造；代价是首字节等待明显变长",
+      "note": "最准但很慢：一次请求要跑意图解析和解释生成两趟，线上实测 52 秒。实测 3 个意图 case 全部正确、零编造",
       "measured": {
         "avg_latency_s": 30.1,
         "hallucinated_cases": "0/3",
-        "probed_at": "2026-09-18"
+        "probed_at": "2026-09-18",
+        "e2e_latency_s": 52.2
       }
     }
   ],

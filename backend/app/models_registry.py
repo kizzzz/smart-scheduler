@@ -8,6 +8,12 @@
 - `glm-4v-flash` 的 `max_tokens` 实测硬上限是 1024（超了返回 `1210 max_tokens参数非法`），
   所以 `max_output_tokens` 是调用方必须夹取的真实约束，不是展示用字段。
 
+`measured` 里刻意区分两个耗时，因为它们差得很远、而用户是照着数字做选择的：
+- `avg_latency_s`：单次模型调用的探测均值；
+- `e2e_latency_s`：线上 `/api/generate` 一整次请求的实测耗时。一次生成要跑意图解析和
+  解释生成两趟 LLM，所以整体耗时接近单次的两倍——`glm-4.5-flash` 单次 30s、整体 52s。
+  展示给用户的 `latency_hint` 用整体耗时，不用单次耗时：用户等的是整个请求。
+
 模块名刻意叫 models_registry 而非 models：`models.py` 是 Pydantic 内部模型，两者混淆
 会让 import 语句读起来像在拿数据模型。
 
@@ -38,30 +44,45 @@ _TEXT_MODELS: List[dict] = [
         "label": "GLM-4-Flash",
         "tier": "free",
         "is_default": True,
-        "latency_hint": "约 4–8 秒",
+        "latency_hint": "整体约 10 秒",
         "accuracy_hint": "均衡",
         "note": "默认。实测偶发编造未提及员工的约束，已被护栏拦截",
-        "measured": {"avg_latency_s": 8.3, "hallucinated_cases": "2/3", "probed_at": _PROBED_AT},
+        "measured": {
+            "avg_latency_s": 8.3,
+            "e2e_latency_s": 9.6,
+            "hallucinated_cases": "2/3",
+            "probed_at": _PROBED_AT,
+        },
     },
     {
         "id": "glm-4-flash-250414",
         "label": "GLM-4-Flash-250414",
         "tier": "free",
         "is_default": False,
-        "latency_hint": "约 4 秒（最快）",
+        "latency_hint": "整体约 6 秒（最快）",
         "accuracy_hint": "均衡",
         "note": "最快。实测同样偶发编造未提及员工的约束，已被护栏拦截",
-        "measured": {"avg_latency_s": 3.7, "hallucinated_cases": "2/3", "probed_at": _PROBED_AT},
+        "measured": {
+            "avg_latency_s": 3.7,
+            "e2e_latency_s": 5.6,
+            "hallucinated_cases": "2/3",
+            "probed_at": _PROBED_AT,
+        },
     },
     {
         "id": "glm-4.5-flash",
         "label": "GLM-4.5-Flash",
         "tier": "free",
         "is_default": False,
-        "latency_hint": "约 30 秒（慢）",
+        "latency_hint": "整体约 50 秒（很慢）",
         "accuracy_hint": "最准",
-        "note": "最准但慢。实测 3 个意图 case 全部正确、零编造",
-        "measured": {"avg_latency_s": 30.1, "hallucinated_cases": "0/3", "probed_at": _PROBED_AT},
+        "note": "最准但很慢：一次请求要跑意图解析和解释生成两趟，线上实测 52 秒。实测 3 个意图 case 全部正确、零编造",
+        "measured": {
+            "avg_latency_s": 30.1,
+            "e2e_latency_s": 52.2,
+            "hallucinated_cases": "0/3",
+            "probed_at": _PROBED_AT,
+        },
     },
 ]
 
@@ -189,6 +210,24 @@ def clamp_max_tokens(model: Optional[str], want: int) -> int:
     """
     cap = _limits().get(model or "")
     return min(want, cap) if cap else want
+
+
+def timeout_for(model: Optional[str], base: float) -> float:
+    """按模型实测耗时推导超时，而不是所有模型共用一个 GLM_TIMEOUT。
+
+    存在的理由很具体：glm-4.5-flash 实测约 30 秒，而 GLM_TIMEOUT 默认 12 秒。
+    共用超时的结果是——用户在界面上选了「最准」的模型，后端每次都超时并静默降级成
+    规则解析，于是他拿到的解析质量比默认模型**更差**。宁可让他多等，也不能给他
+    一个永远无法生效的选项。
+
+    留出 2.5 倍余量：实测值是均值，尾部延迟会明显更高。
+    """
+    latency = 0.0
+    for m in _TEXT_MODELS + _VISION_MODELS:
+        if m["id"] == model:
+            latency = float((m.get("measured") or {}).get("avg_latency_s") or 0.0)
+            break
+    return max(base, latency * 2.5) if latency else base
 
 
 def reject_text_model(model: str) -> str:

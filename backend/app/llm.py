@@ -63,11 +63,14 @@ async def _chat(
     if json_mode:
         payload["response_format"] = {"type": "json_object"}
     headers = {"Authorization": f"Bearer {api_key()}", "Content-Type": "application/json"}
+    # 按模型实测耗时放宽超时：慢模型共用 GLM_TIMEOUT 会每次超时并静默降级，
+    # 等于给用户一个永远无法生效的选项
+    effective_timeout = models_registry.timeout_for(used, timeout or GLM_TIMEOUT)
     last: Exception | None = None
     for attempt in range(GLM_RETRIES + 1):
         try:
             async with httpx.AsyncClient(
-                timeout=timeout or GLM_TIMEOUT, trust_env=False, proxy=GLM_PROXY
+                timeout=effective_timeout, trust_env=False, proxy=GLM_PROXY
             ) as client:
                 r = await client.post(f"{GLM_BASE_URL}/chat/completions", json=payload, headers=headers)
                 r.raise_for_status()
@@ -76,6 +79,10 @@ async def _chat(
         except (httpx.TransportError, httpx.HTTPStatusError) as exc:
             # 5xx 与网络抖动可重试；4xx（鉴权/参数错误）直接失败，重试没有意义
             if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code < 500:
+                raise
+            # 超时不重试：超时说明已经等满了整个预算，再试两次只会把等待时间翻三倍。
+            # 对 glm-4.5-flash 这种 75s 预算的慢模型，重试会让单次请求拖到 225s。
+            if isinstance(exc, httpx.TimeoutException):
                 raise
             last = exc
             if attempt < GLM_RETRIES:

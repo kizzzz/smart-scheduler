@@ -147,7 +147,10 @@ function Group({
 function measuredLine(option: ModelOption): string {
   const m = option.measured;
   const parts: string[] = [];
-  if (m?.avg_latency_s !== undefined) parts.push(`实测均值 ${m.avg_latency_s}s`);
+  // 单次调用和整次请求的耗时差得很远（4.5-flash 是 30s vs 52s），两个都给出来，
+  // 只报单次会让用户以为等 30 秒就够了
+  if (m?.e2e_latency_s !== undefined) parts.push(`整次请求 ${m.e2e_latency_s}s`);
+  if (m?.avg_latency_s !== undefined) parts.push(`单次调用 ${m.avg_latency_s}s`);
   if (m?.hallucinated_cases) parts.push(`编造 ${m.hallucinated_cases} case`);
   if (m?.cell_accuracy) parts.push(`格子准确率 ${m.cell_accuracy}`);
   if (option.max_output_tokens) parts.push(`输出上限 ${option.max_output_tokens} tokens`);

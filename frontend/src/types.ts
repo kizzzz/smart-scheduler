@@ -51,7 +51,10 @@ export interface Meta {
  * 文本模型给 `hallucinated_cases`，视觉模型给 `cell_accuracy`。
  */
 export interface ModelMeasured {
+  /** 单次模型调用的探测均值 */
   avg_latency_s?: number;
+  /** 线上一整次 /api/generate 的实测耗时。一次生成跑两趟 LLM，所以接近单次的两倍 */
+  e2e_latency_s?: number;
   hallucinated_cases?: string;
   cell_accuracy?: string;
   probed_at?: string;

@@ -12,7 +12,7 @@
 |---|---|---|---|
 | L1 意图解析 | 自然语言 → 结构化约束 | GLM（`glm-4-flash`），失败降级为规则解析 | 可控：解析结果全部回显给店长确认 |
 | L2 约束求解 | 生成候选排班 | 回溯搜索 + 前向检查 + 局部优化，**零模型参与** | 可控：结果必须过 L3 |
-| L3 规则校验 | 判定合规，**唯一真相源** | 独立于求解器的纯函数 | 不允许出错，41 个测试覆盖 |
+| L3 规则校验 | 判定合规，**唯一真相源** | 独立于求解器的纯函数 | 不允许出错，20 个规则测试直接覆盖 |
 | L4 解释生成 | 结构化事实 → 人话 | GLM，且输出被确定性规则清洗 | 可控：与校验结论矛盾的句子直接丢弃 |
 
 三条硬性设计决定：
@@ -84,7 +84,7 @@ cd backend
 pip install -r requirements-dev.txt
 export GLM_API_KEY=<你的智谱 Key>     # 可留空，会走规则兜底
 uvicorn app.main:app --reload --port 8000
-pytest -q                             # 41 个测试
+pytest -q                             # 96 个测试
 ```
 
 前端：
@@ -191,7 +191,7 @@ backend/
   app/importer.py     排班表导入：CSV/Excel 确定性解析 + 图片视觉识别
   app/serializers.py  内部模型 → 前端契约
   app/main.py         FastAPI 路由
-  tests/              92 个测试
+  tests/              96 个测试
 frontend/             React 19 + TS + Vite + Tailwind
   src/components/ModelPicker.tsx    模型选择器（含实测数据与能力边界说明）
   src/components/ImportPanel.tsx    导入入口（拖拽 / 选择文件 / 下载模板）
