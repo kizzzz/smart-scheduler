@@ -28,66 +28,7 @@
     }
   },
   "solution": null,
-  "validation": {
-    "passed": false,
-    "violation_count": 0,
-    "rules": [
-      {
-        "id": "R-01",
-        "text": "每个班至少 1 名具备店长值守资格的员工",
-        "passed": false,
-        "violations": []
-      },
-      {
-        "id": "R-02",
-        "text": "每个班至少 2 名具备饮品制作技能的员工",
-        "passed": false,
-        "violations": []
-      },
-      {
-        "id": "R-03",
-        "text": "每个班至少 1 名具备收银技能的员工",
-        "passed": false,
-        "violations": []
-      },
-      {
-        "id": "R-04",
-        "text": "工作日每班 ≥4 人，周末每班 ≥6 人",
-        "passed": false,
-        "violations": []
-      },
-      {
-        "id": "R-05",
-        "text": "每人每周工时 ≤40 小时（≤5 个班）",
-        "passed": false,
-        "violations": []
-      },
-      {
-        "id": "R-06",
-        "text": "任何人不得连续工作超过 5 天",
-        "passed": false,
-        "violations": []
-      },
-      {
-        "id": "R-07",
-        "text": "晚班后不得接次日早班（间隔不足 12 小时）",
-        "passed": false,
-        "violations": []
-      },
-      {
-        "id": "R-08",
-        "text": "员工请假或不可用日期绝不排班",
-        "passed": false,
-        "violations": []
-      },
-      {
-        "id": "R-09",
-        "text": "技能仅取自员工档案，不得自行补充技能",
-        "passed": false,
-        "violations": []
-      }
-    ]
-  },
+  "validation": null,
   "explanation": {
     "bullets": [
       "这条指令还不能唯一确定，先确认以下问题再排，避免排错班",

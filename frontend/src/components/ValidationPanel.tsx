@@ -9,6 +9,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import type { Meta, RuleResult, SoftMetrics, Suggestion, Validation } from '../types';
+import { formatScope } from '../lib/schedule';
 import { cn, pct } from '../lib/utils';
 import { Badge } from './ui/Badge';
 import { Card, CardBody, CardHeader } from './ui/Card';
@@ -39,6 +40,14 @@ export function ValidationPanel({
   suggestionsHint?: string;
   onApplySuggestion: (s: Suggestion) => void;
 }) {
+  /**
+   * `validation === null` 是后端在「没排出方案」时的正常回值（契约：solution=null → validation=null）。
+   * 这种情况必须自己也进入 pending：否则下面的 `byId` 全都取不到，每条规则被兜底成 passed=true，
+   * 面板会理直气壮地显示「9/9 全部通过」——把一次无解粉饰成完美排班，比报错还危险。
+   */
+  const noResult = validation === null;
+  const idle = pending || noResult;
+
   const byId = new Map((validation?.rules ?? []).map((r) => [r.id, r]));
   const rows: RuleResult[] = meta.rules.map(
     (r) => byId.get(r.id) ?? { id: r.id, text: r.text, passed: true, violations: [] },
@@ -52,14 +61,14 @@ export function ValidationPanel({
     <Card>
       <CardHeader
         icon={<ShieldCheck size={15} />}
-        title={pending ? `规则校验 · 待排班（共 ${total} 条硬规则）` : `规则校验 · ${passedCount}/${total} 通过`}
+        title={idle ? `规则校验 · 待排班（共 ${total} 条硬规则）` : `规则校验 · ${passedCount}/${total} 通过`}
         subtitle={
-          pending
+          idle
             ? pendingHint ?? '本次没有产出排班，硬规则尚未参与校验'
             : subtitle ?? '校验器独立于求解器，任何来源的排班都过同一套硬规则'
         }
         right={
-          pending ? (
+          idle ? (
             <Badge tone="neutral" icon={<Clock3 size={10} />}>
               待排班
             </Badge>
@@ -83,8 +92,9 @@ export function ValidationPanel({
           {rows.map((r) => (
             <RuleRow
               key={r.id}
+              meta={meta}
               rule={r}
-              pending={pending}
+              pending={idle}
               suggestionsDisabled={suggestionsDisabled}
               suggestionsHint={suggestionsHint}
               onApplySuggestion={onApplySuggestion}
@@ -101,25 +111,25 @@ export function ValidationPanel({
             value={softMetrics?.preference_rate ?? 0}
             display={softMetrics ? pct(softMetrics.preference_rate) : '—'}
             hint="被排班次与员工班次偏好一致的比例"
-            muted={pending}
+            muted={idle}
           />
           <MetricBar
             label="工时均衡度"
             value={softMetrics?.balance_score ?? 0}
             display={softMetrics ? softMetrics.balance_score.toFixed(2) : '—'}
             hint="0–1，越高说明人均班次越平均"
-            muted={pending}
+            muted={idle}
           />
           <MetricBar
             label="技能冗余度"
             value={softMetrics?.skill_redundancy ?? 0}
             display={softMetrics ? pct(softMetrics.skill_redundancy) : '—'}
             hint="平均每班的技能冗余人数，按每班 8 人次冗余记满分"
-            muted={pending}
+            muted={idle}
           />
         </div>
         <p className="mt-2.5 text-[11px] text-mut-2">
-          {pending
+          {idle
             ? '软约束数值随排班方案产出，当前无方案可计算。'
             : '软约束不阻塞生成，仅用于方案排序与向店长解释权衡。'}
         </p>
@@ -128,20 +138,15 @@ export function ValidationPanel({
   );
 }
 
-/** 违规定位：周工时这类跨班次规则后端不给 day/shift，此时不能渲染成「周 」 */
-function violationScope(day: string, shift: string): string {
-  if (day && shift) return `周${day} ${shift}`;
-  if (day) return `周${day} 全天`;
-  return '本周整体';
-}
-
 function RuleRow({
+  meta,
   rule,
   pending,
   suggestionsDisabled,
   suggestionsHint,
   onApplySuggestion,
 }: {
+  meta: Meta;
   rule: RuleResult;
   pending: boolean;
   suggestionsDisabled: boolean;
@@ -214,7 +219,7 @@ function RuleRow({
               <p className="flex items-start gap-1.5 text-[11.5px] leading-relaxed text-fail-deep">
                 <CircleAlert size={12} className="mt-[2px] flex-none text-fail" />
                 <span>
-                  <b className="font-semibold">{violationScope(v.day, v.shift)}</b>
+                  <b className="font-semibold">{formatScope(meta, v.day, v.shift)}</b>
                   {v.employees.length ? `（${v.employees.join('、')}）` : ''}：{v.message}
                 </span>
               </p>

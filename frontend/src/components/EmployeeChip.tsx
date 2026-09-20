@@ -49,14 +49,17 @@ export function EmployeeChip({
     <div className="space-y-1">
       <div className="flex items-center gap-1.5 font-semibold">
         {isManager ? <Crown size={10} className="text-teal-200" /> : null}
-        {employee.id} · {employee.role}
+        {employee.name ? `${employee.name}（${employee.id}）` : employee.id} · {employee.role}
       </div>
-      <div className="text-white/75">技能：{employee.skills.join(' / ')}</div>
-      <div className="text-white/75">偏好：{employee.preference}</div>
+      <div className="text-white/75">技能：{employee.skills.join(' / ') || '无'}</div>
+      <div className="text-white/75">偏好：{employee.preference || '无特别偏好'}</div>
       <div className="text-white/75">
-        可工作：{employee.available_days.join('')}
-        {employee.leave_days.length ? ` · 请假：${employee.leave_days.join('')}` : ''}
+        可工作：{employee.available_days.join('、') || '（无可用时段）'}
+        {employee.leave_days.length ? ` · 请假：${employee.leave_days.join('、')}` : ''}
       </div>
+      {employee.max_shifts != null ? (
+        <div className="text-white/75">个人班次上限：{employee.max_shifts}</div>
+      ) : null}
       {interactive ? <div className="pt-0.5 text-teal-200">点击换人</div> : null}
     </div>
   ) : (

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import pathlib
 import sys
 
 import pytest
@@ -148,13 +149,31 @@ def _chat(model=None, max_tokens=900):
 def test_chat_defaults_to_module_model(captured):
     _chat()
     assert captured.last_payload["model"] == llm.GLM_MODEL
-    assert captured.last_payload["max_tokens"] == 900
 
 
 def test_chat_passes_requested_model(captured):
-    _chat(model="glm-4.5-flash")
-    assert captured.last_payload["model"] == "glm-4.5-flash"
-    assert captured.last_payload["max_tokens"] == 900      # 文本模型不设上限，原样透传
+    _chat(model="glm-4-flash")
+    assert captured.last_payload["model"] == "glm-4-flash"
+    assert captured.last_payload["max_tokens"] == 900      # 非推理模型不抬高、也无上限，原样透传
+
+
+def test_chat_raises_output_budget_for_reasoning_model(captured):
+    """推理模型必须拿到更大的输出预算，否则 JSON 会被写到一半截断。
+
+    这条来自线上实测：glm-4.5-flash 按 900 tokens 调用时偶发 finish_reason=length，
+    `_extract_json` 拿不到合法 JSON，于是静默掉到规则解析——耗时正常、模型也返回了，
+    但解析质量突然变成规则级，日志里当时什么都看不到。
+    """
+    _chat(model="glm-4.5-flash", max_tokens=900)
+    assert captured.last_payload["max_tokens"] == 2048
+
+
+def test_output_floor_never_breaks_hard_cap():
+    """抬高不能突破模型硬上限：glm-4v-flash 超过 1024 会整体参数非法。"""
+    assert models_registry.resolve_max_tokens("glm-4v-flash", 2048) == 1024
+    assert models_registry.resolve_max_tokens("glm-4.5-flash", 600) == 2048
+    assert models_registry.resolve_max_tokens("glm-4.5-flash", 4096) == 4096
+    assert models_registry.resolve_max_tokens("glm-4-flash", 900) == 900
 
 
 def test_chat_clamps_vision_max_tokens(captured):
@@ -190,6 +209,49 @@ def test_timeout_scales_with_measured_latency():
     # 未登记的模型（GLM_EXTRA_MODELS 放开的付费模型）没有实测数据，保持 base
     assert models_registry.timeout_for("glm-4-plus", 12.0) == 12.0
     assert models_registry.timeout_for(None, 12.0) == 12.0
+
+
+def test_default_text_model_timeout_is_sufficient():
+    """默认模型的超时预算必须覆盖它的实测耗时——这是换默认模型时最容易踩的坑。
+
+    默认模型现在是 glm-4.5-flash（实测单次 ~30s）。如果哪天有人把 DEFAULT_TEXT_MODEL
+    改成一个慢模型却没有登记 measured.avg_latency_s，timeout_for 会退回 12s 的 base，
+    于是**每一次默认请求都超时降级成规则解析**，而界面上看不出任何异常。
+    """
+    default = models_registry.DEFAULT_TEXT_MODEL
+    entry = next(m for m in models_registry.text_models() if m["id"] == default)
+    measured = (entry.get("measured") or {}).get("avg_latency_s")
+    assert measured, f"默认模型 {default} 必须有实测耗时，否则超时预算无从推导"
+    assert models_registry.timeout_for(default, 12.0) >= measured * 2, (
+        f"默认模型 {default} 的超时预算不足，会每次超时并静默降级"
+    )
+
+
+def test_edge_timeout_covers_worst_case_generate():
+    """边缘反代的超时必须覆盖一整次生成的最坏耗时，否则会「后端还在算、边缘先 504」。
+
+    这条测试是踩过的坑：默认模型换成 glm-4.5-flash 后，Caddy 的 read_timeout 还是 60s，
+    线上实测一次生成能到 85s，于是页面拿到 504、后端日志却一切正常，极难排查。
+    一次生成跑两趟 LLM，所以预算要按 2× 单次算。
+    """
+    import re
+
+    caddyfile = (
+        pathlib.Path(__file__).resolve().parents[2] / "deploy" / "Caddyfile"
+    )
+    m = re.search(r"read_timeout\s+(\d+)s", caddyfile.read_text(encoding="utf-8"))
+    assert m, "Caddyfile 未显式设置 read_timeout，慢模型会被边缘截断"
+    edge_budget = int(m.group(1))
+    worst_case = models_registry.timeout_for(models_registry.DEFAULT_TEXT_MODEL, 12.0) * 2
+    assert edge_budget >= worst_case, (
+        f"边缘超时 {edge_budget}s 覆盖不了最坏 {worst_case:.0f}s，慢模型会返回 504"
+    )
+
+
+def test_module_default_follows_registry(monkeypatch):
+    """llm.GLM_MODEL 未显式配置时必须跟随注册表默认值，不能各处硬写一份。"""
+    monkeypatch.delenv("GLM_MODEL", raising=False)
+    assert llm.GLM_MODEL == models_registry.DEFAULT_TEXT_MODEL
 
 
 def test_chat_uses_model_specific_timeout(captured):

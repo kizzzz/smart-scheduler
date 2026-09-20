@@ -26,6 +26,24 @@ OUT.mkdir(exist_ok=True)
 errors: list[str] = []
 
 
+async def goto(page, url=None):
+    """跨境链路会丢包，一次 ERR_TIMED_OUT 不代表站点有问题，所以重试三次再判失败。
+
+    只在打开页面这一步重试：后面的断言必须一次通过，重试会掩盖真实的交互缺陷。
+    """
+    target = url or BASE
+    for attempt in range(3):
+        try:
+            await page.goto(target, wait_until="domcontentloaded", timeout=60_000)
+            await page.wait_for_load_state("networkidle", timeout=30_000)
+            return
+        except Exception as exc:
+            if attempt == 2:
+                raise
+            print(f"  goto 重试 {attempt + 1}/2（{type(exc).__name__}）")
+            await page.wait_for_timeout(2000)
+
+
 async def shot(page, name):
     await page.screenshot(path=str(OUT / f"{name}.png"), full_page=True)
     print(f"  shot -> {name}.png")
@@ -53,7 +71,7 @@ async def main():
         page.on("pageerror", lambda e: errors.append(f"pageerror: {e}"))
 
         print("[1] 打开首页")
-        await page.goto(BASE, wait_until="networkidle")
+        await goto(page)
         await page.wait_for_timeout(800)
         await shot(page, "01-home")
 
@@ -97,7 +115,7 @@ async def main():
                 errors.append("应用后仍停留在预览态")
 
         print("[5] 导入脏数据样例，验证 unresolved 展示")
-        await page.goto(BASE, wait_until="networkidle")
+        await goto(page)
         await page.wait_for_timeout(700)
         if await upload(page, "roster_messy.csv"):
             body = await page.content()
@@ -107,13 +125,39 @@ async def main():
             await shot(page, "05-import-messy-unresolved")
 
         print("[6] 矩阵表布局")
-        await page.goto(BASE, wait_until="networkidle")
+        await goto(page)
         await page.wait_for_timeout(700)
         if await upload(page, "roster_matrix_ok.csv"):
             body = await page.content()
             if "矩阵" not in body:
                 errors.append("矩阵表未标注布局类型")
             await shot(page, "06-import-matrix")
+
+        print("[7] 默认模型生成：等待期必须有秒数反馈，且进度不能瞬间冲到最后一档")
+        await goto(page)
+        await page.wait_for_timeout(700)
+        await page.locator("#instruction").fill("下周正常排班，E05 周六请假")
+        await page.get_by_role("button", name="生成排班").first.click()
+        # 默认模型 glm-4.5-flash 实测约 52 秒。没有秒数反馈用户会以为页面卡死，
+        # 所以这里断言的是「等待期的可感知性」，不只是最终结果对不对。
+        try:
+            await page.get_by_text("已等待").first.wait_for(timeout=8000)
+        except Exception:
+            errors.append("生成等待期没有「已等待 Xs」反馈")
+        body = await page.content()
+        if "生成解释中" in body:
+            errors.append("进度条在开跑瞬间就冲到「生成解释中」，会让 50 秒的等待看起来像卡死")
+        await shot(page, "07-generating-elapsed")
+        try:
+            # 整次请求实测 ~43s，留 180s 余量给尾部延迟
+            await page.get_by_role("button", name="重新生成排班").first.wait_for(timeout=180_000)
+        except Exception:
+            errors.append("180s 内未完成默认模型生成")
+        await page.wait_for_timeout(800)
+        body = await page.content()
+        if "降级" in body and "规则解析" in body:
+            errors.append("默认模型被降级成规则解析——超时预算不够")
+        await shot(page, "08-generated-board")
 
         await browser.close()
 

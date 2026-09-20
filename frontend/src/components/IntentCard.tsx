@@ -49,6 +49,21 @@ export function IntentCard({
         </div>
       ) : null}
 
+      {/*
+        换模型不是故障，所以不用告警色；但也不能不说：用户是照着模型的准确率做选择的，
+        默认模型超时后偷偷换成更快的模型，等于给了一个他没同意的质量档位。
+      */}
+      {!intent.degraded && intent.model_fallback_from ? (
+        <div className="mb-2.5 flex items-start gap-2 rounded-lg border border-teal-200 bg-white px-2.5 py-2 text-[11.5px] leading-relaxed text-ink-2">
+          <TriangleAlert size={13} className="mt-[1px] flex-none text-teal-700" />
+          <span>
+            {intent.degrade_reason ??
+              `${intent.model_fallback_from} 本次超时，已自动改用更快的模型完成解析`}
+            。解析仍由模型完成、护栏照常生效，建议核对下方理解。
+          </span>
+        </div>
+      ) : null}
+
       <div className="flex items-center gap-2">
         <Wand2 size={13} className="flex-none text-teal-700" />
         <h3 className="text-[13px] font-semibold text-ink">已理解为</h3>
@@ -73,7 +88,13 @@ export function IntentCard({
               </Badge>
             </Tooltip>
           ) : null}
-          {intent.degraded ? <Badge tone="pend">结构化降级解析</Badge> : <Badge tone="pass">LLM 解析成功</Badge>}
+          {intent.degraded ? (
+            <Badge tone="pend">结构化降级解析</Badge>
+          ) : intent.model_fallback_from ? (
+            <Badge tone="pend">已自动换模型</Badge>
+          ) : (
+            <Badge tone="pass">LLM 解析成功</Badge>
+          )}
         </div>
       </div>
 

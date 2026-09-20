@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app import solver  # noqa: E402
 from app import validator as V  # noqa: E402
-from app.data import DAYS, SHIFTS, all_slots  # noqa: E402
+from app.data import DAYS, all_slots  # noqa: E402
 from app.models import Pin, Schedule, ScheduleRequest, Slot, TempLeave  # noqa: E402
 
 
@@ -45,7 +45,7 @@ def test_baseline_zero_violation(baseline):
 
 def test_all_rules_reported(baseline):
     rep = V.validate(baseline)
-    assert [r.rule_id for r in rep.rule_results] == [f"R-0{i}" for i in range(1, 10)]
+    assert [r.rule_id for r in rep.rule_results] == [f"R-{i:02d}" for i in range(1, 11)]
     assert all(r.passed for r in rep.rule_results)
 
 

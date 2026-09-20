@@ -131,7 +131,7 @@ def test_import_runs_the_same_validator(client):
     assert v["passed"] is False and v["violation_count"] >= 3
     broken = {r["id"] for r in v["rules"] if not r["passed"]}
     assert {"R-01", "R-04", "R-08"} <= broken
-    assert len(v["rules"]) == 9                     # 结构与 /api/validate 完全一致
+    assert len(v["rules"]) == 10                    # 结构与 /api/validate 完全一致
 
 
 def test_compliant_import_passes_validation(client):
@@ -167,8 +167,24 @@ def test_parse_failure_is_200_not_5xx(client):
     body = r.json()
     assert body["ok"] is False and body["slots"] == []
     assert body["warnings"] and "模板" in body["warnings"][0]
-    assert body["validation"]["passed"] is False and len(body["validation"]["rules"]) == 9
+    # 解析失败时 validation 为 null：一张没读懂的表上「10 条规则全部 passed=false」
+    # 是在报告一个没发生过的失败，会让前端画满红叉、把用户引向改规则
+    assert body["validation"] is None
     assert body["soft_metrics"]["balance_score"] == 0.0     # 空表不许算出满分均衡度
+
+
+def test_partial_parse_still_returns_real_validation(client):
+    """只要解析出内容，validation 就必须是真实校验结果，而不是跟着 ok=false 一起消失。
+
+    与上一个用例成对：null 的触发条件是「什么都没读出来」，不是「这张表不合规」。
+    """
+    csv = "日期,班次,员工\n周一,早班,E01\n"
+    r = client.post("/api/import", files={"file": ("x.csv", csv.encode(), "text/csv")})
+    body = r.json()
+    assert body["slots"], "这份 CSV 应该能解析出至少一格"
+    assert body["validation"] is not None
+    # 只排了一格，人数下限必然不满足——报告里要如实体现
+    assert body["validation"]["passed"] is False and len(body["validation"]["rules"]) == 10
 
 
 def test_rejects_bad_extension_and_oversize(client):

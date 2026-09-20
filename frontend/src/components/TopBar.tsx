@@ -8,11 +8,20 @@ export function TopBar({
   health,
   mock,
   onRecheck,
+  subtitle,
+  nav,
   modelPicker,
 }: {
   health: HealthState;
   mock: boolean;
   onRecheck: () => void;
+  /**
+   * 副标题由 App 按当前配置拼装。配置化之后「7 天 2 班 9 条规则」不再是常量，
+   * 写死在这里就会和用户实际的配置对不上。
+   */
+  subtitle?: string;
+  /** 页面切换（配置 / 排班） */
+  nav?: ReactNode;
   /** 模型选择器由 App 组装后塞进来，TopBar 不感知模型状态 */
   modelPicker?: ReactNode;
 }) {
@@ -31,8 +40,11 @@ export function TopBar({
         </span>
         <div className="min-w-0">
           <h1 className="truncate text-[15px] font-semibold tracking-[0.2px] text-ink">智能排班助手</h1>
-          <p className="truncate text-[11.5px] text-mut">自然语言排班 · 9 条硬规则零违规</p>
+          <p className="truncate text-[11.5px] text-mut" title={subtitle}>
+            {subtitle ?? '自然语言排班 · 硬规则零违规'}
+          </p>
         </div>
+        {nav ? <div className="ml-1 flex-none">{nav}</div> : null}
         <div className="ml-auto flex items-center gap-2.5">
           {mock ? (
             <span className="inline-flex items-center gap-1 rounded-full border border-pend-border bg-pend-bg px-2 py-[2px] text-[10.5px] font-semibold text-pend">

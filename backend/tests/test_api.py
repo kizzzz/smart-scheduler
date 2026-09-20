@@ -47,10 +47,15 @@ def test_scenarios_contract(client):
 def test_generate_contract(generated):
     r = generated
     assert set(r) == {
-        "ok", "mode", "intent", "solution", "validation",
+        "ok", "mode", "intent", "scenario", "solution", "validation",
         "explanation", "infeasible", "clarification", "diff", "timing",
     }
     assert r["ok"] is True and r["infeasible"] is None
+    # scenario 回显（契约 5.3）：看板按它渲染维度，不再自己按「7 天 × 2 班、周末=6」推
+    assert [d["id"] for d in r["scenario"]["days"]] == ["一", "二", "三", "四", "五", "六", "日"]
+    assert [s["id"] for s in r["scenario"]["shifts"]] == ["早班", "晚班"]
+    assert r["scenario"]["days"][5]["peak"] is True and r["scenario"]["days"][0]["peak"] is False
+    assert r["scenario"]["shifts"][0]["time_label"] == "09:00–17:00"
     assert len(r["solution"]["slots"]) == 14
     slot = r["solution"]["slots"][0]
     assert set(slot) == {"day", "day_label", "shift", "shift_time", "min_required", "employees"}
@@ -60,7 +65,7 @@ def test_generate_contract(generated):
     # import_ms 在 generate 恒为 0，但字段必须常在（契约 v1.1），前端才不用做兼容判断
     assert set(r["timing"]) == {"parse_ms", "solve_ms", "validate_ms", "explain_ms", "import_ms", "total_ms"}
     assert r["timing"]["import_ms"] == 0
-    assert len(r["validation"]["rules"]) == 9
+    assert len(r["validation"]["rules"]) == 10
     assert r["validation"]["passed"] and r["validation"]["violation_count"] == 0
     assert r["explanation"]["bullets"]
 
@@ -73,6 +78,8 @@ def test_generate_infeasible_contract(client):
     if r["mode"] == "clarify":
         pytest.skip("降级解析未识别该指令，无解路径由 solver 单测覆盖")
     assert r["ok"] is False and r["solution"] is None
+    # 无解时不给「所有规则都不通过」的空报告：没有排班表就没有被违反的规则
+    assert r["validation"] is None
     inf = r["infeasible"]
     assert inf and inf["proven"] is True
     assert inf["summary"] and inf["min_conflict_set"]
@@ -86,7 +93,8 @@ def test_generate_clarification_contract(client):
     assert r["ok"] is False and r["mode"] == "clarify"
     assert r["solution"] is None and r["infeasible"] is None
     assert r["clarification"]["questions"]
-    assert len(r["validation"]["rules"]) == 9      # 结构仍完整，前端不必特判
+    # 没有排班表就没有校验结果：空报告会让每条规则显示红叉，报告一个没发生过的失败
+    assert r["validation"] is None
 
 
 def test_validate_and_suggestions(client, generated):

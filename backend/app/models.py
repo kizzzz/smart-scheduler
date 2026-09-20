@@ -69,6 +69,9 @@ class ScheduleRequest(BaseModel):
     parse_confidence: float = 1.0
     # 降级到规则解析时为 None：那条路径根本没有模型参与，报一个模型名是误导
     model_used: Optional[str] = None
+    # 所选模型超时后自动换用了更快的模型时，记下原本要用的那个。
+    # 不记的话用户会以为自己选的模型一直在生效，而实际解析质量已经变了。
+    model_fallback_from: Optional[str] = None
     guardrail: GuardrailStats = Field(default_factory=GuardrailStats)
 
 

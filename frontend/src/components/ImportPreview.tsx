@@ -16,7 +16,7 @@ import { EmployeeChip } from './EmployeeChip';
 
 /**
  * 导入确认态。刻意做成主区域的一个状态而不是弹窗：
- * 预览要同时容纳 14 格网格、解析统计、未匹配明细和完整的规则体检结论，
+ * 预览要同时容纳整张网格（最多 14 天 × 4 班）、解析统计、未匹配明细和完整的规则体检结论，
  * 塞进 Dialog 会把「体检结论」压到滚动区外——而体检恰恰是导入功能的主角。
  *
  * 本组件只负责「解析结果」部分，体检结论由 App 紧随其后复用 ValidationPanel 渲染。
@@ -110,14 +110,14 @@ export function ImportPreview({
             label="解析格子"
             value={`${found}/${expected}`}
             tone={missing > 0 ? 'warn' : 'ok'}
-            hint={missing > 0 ? `${missing} 格未解析到` : '一周 14 格齐全'}
+            hint={missing > 0 ? `${missing} 格未解析到` : `${expected} 格齐全`}
           />
           <StatBox label="解析人次" value={String(stats?.assignments ?? '—')} tone="plain" hint="文件里读到的排班总人次" />
           <StatBox
             label="已匹配工号"
             value={String(stats?.resolved ?? '—')}
             tone="ok"
-            hint="归一到 E01–E20 并写入班表"
+            hint="归一到配置里的员工工号并写入班表"
           />
           <StatBox
             label="未匹配"
@@ -224,16 +224,20 @@ function StatBox({
   );
 }
 
-/** 14 格网格：与看板同一套版式，缺失的格子高亮成待补状态，一眼能看出漏了哪一格 */
+/** 预览网格：与看板同一套版式，列数随配置维度变化，缺失的格子高亮成待补状态 */
 function PreviewGrid({ meta, slots }: { meta: Meta; slots: Slot[] }) {
   const bySlot = new Map(slots.map((s) => [slotKey(s.day, s.shift), s]));
   const empMap = new Map(meta.employees.map((e) => [e.id, e]));
+  const cols = Math.max(meta.days.length, 1);
 
   return (
     <div className="-mx-1 overflow-x-auto px-1 pb-1 scrollbar-thin">
       <div
-        className="grid min-w-[860px] gap-1"
-        style={{ gridTemplateColumns: '54px repeat(7, minmax(0, 1fr))' }}
+        className="grid gap-1"
+        style={{
+          gridTemplateColumns: `54px repeat(${cols}, minmax(0, 1fr))`,
+          minWidth: 54 + cols * 108,
+        }}
       >
         <div />
         {meta.days.map((d) => (
@@ -245,7 +249,6 @@ function PreviewGrid({ meta, slots }: { meta: Meta; slots: Slot[] }) {
             )}
           >
             {d.label}
-            <span className="ml-1 font-normal text-mut-2">≥{d.min_required}</span>
           </div>
         ))}
 

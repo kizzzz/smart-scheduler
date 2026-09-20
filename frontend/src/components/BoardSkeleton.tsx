@@ -5,14 +5,37 @@ import { Skeleton, SkeletonChip } from './ui/Skeleton';
 import { PHASE_TEXT } from './InstructionPanel';
 import { Badge } from './ui/Badge';
 
-const STEPS: Array<{ key: SolvePhase; label: string; detail: string }> = [
-  { key: 'parse', label: '解析指令', detail: 'LLM 抽取周期 / 临时约束 / 优化目标' },
-  { key: 'solve', label: '求解排班', detail: '确定性回溯 + 随机重启，14 个班次' },
-  { key: 'validate', label: '校验规则', detail: '独立校验器逐条核对 9 条硬规则' },
-  { key: 'explain', label: '生成解释', detail: '把决策日志翻译成店长能懂的人话' },
-];
+/** 进度条上的文案也得跟着配置走：格数与规则条数都是配置算出来的，不是常量 */
+function steps(
+  slotCount: number | null,
+  ruleCount: number | null,
+): Array<{ key: SolvePhase; label: string; detail: string }> {
+  return [
+    { key: 'parse', label: '解析指令', detail: 'LLM 抽取周期 / 临时约束 / 优化目标' },
+    {
+      key: 'solve',
+      label: '求解排班',
+      detail: slotCount ? `确定性回溯 + 随机重启，${slotCount} 个格子` : '确定性回溯 + 随机重启',
+    },
+    {
+      key: 'validate',
+      label: '校验规则',
+      detail: ruleCount ? `独立校验器逐条核对 ${ruleCount} 条硬规则` : '独立校验器逐条核对硬规则',
+    },
+    { key: 'explain', label: '生成解释', detail: '把决策日志翻译成店长能懂的人话' },
+  ];
+}
 
-export function BoardSkeleton({ phase }: { phase: SolvePhase }) {
+export function BoardSkeleton({
+  phase,
+  slotCount = null,
+  ruleCount = null,
+}: {
+  phase: SolvePhase;
+  slotCount?: number | null;
+  ruleCount?: number | null;
+}) {
+  const STEPS = steps(slotCount, ruleCount);
   const activeIndex = STEPS.findIndex((s) => s.key === phase);
 
   return (

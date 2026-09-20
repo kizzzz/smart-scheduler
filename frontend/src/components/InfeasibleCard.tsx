@@ -2,10 +2,17 @@ import { BadgeCheck, Coins, Lightbulb, MapPin, Stamp } from 'lucide-react';
 import type { Infeasible } from '../types';
 import { Badge } from './ui/Badge';
 
-export function InfeasibleCard({ infeasible }: { infeasible: Infeasible }) {
-  const title = infeasible.proven ? '本周无可行解' : '本次未找到可行解';
+export function InfeasibleCard({
+  infeasible,
+  ruleCount = null,
+}: {
+  infeasible: Infeasible;
+  /** 当前生效的硬规则条数；缺省时不提数字，也好过提一个写死的 9 */
+  ruleCount?: number | null;
+}) {
+  const title = infeasible.proven ? '本周期无可行解' : '本次未找到可行解';
   const claim = infeasible.proven
-    ? '已用计数下界证明：在当前约束下不存在任何满足 9 条硬规则的排班。'
+    ? `已用计数下界证明：在当前约束下不存在任何满足${ruleCount ? ` ${ruleCount} 条` : ''}硬规则的排班。`
     : '在本次搜索预算内没有找到可行解，但不能断言一定无解 —— 放宽任一约束或重试都可能找到方案。';
 
   return (

@@ -65,11 +65,7 @@
     }
   },
   "solution": null,
-  "validation": {
-    "passed": false,
-    "violation_count": 0,
-    "rules": []
-  },
+  "validation": null,
   "explanation": {
     "bullets": [
       "周二仅剩 E03 一名具备店长值守资格的员工，而周二早班与晚班各需 1 名，R-01 无法同时满足。",

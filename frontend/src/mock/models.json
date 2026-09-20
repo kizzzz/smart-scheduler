@@ -1,15 +1,15 @@
 {
-  "default_text": "glm-4-flash",
+  "default_text": "glm-4.5-flash",
   "default_vision": "glm-4v-flash",
   "text": [
     {
       "id": "glm-4-flash",
       "label": "GLM-4-Flash",
       "tier": "free",
-      "is_default": true,
+      "is_default": false,
       "latency_hint": "整体约 10 秒",
       "accuracy_hint": "均衡",
-      "note": "默认。实测偶发编造未提及员工的约束，已被护栏拦截",
+      "note": "速度与准确度折中。实测偶发编造未提及员工的约束，已被护栏拦截",
       "measured": {
         "avg_latency_s": 8.3,
         "hallucinated_cases": "2/3",
@@ -36,15 +36,15 @@
       "id": "glm-4.5-flash",
       "label": "GLM-4.5-Flash",
       "tier": "free",
-      "is_default": false,
-      "latency_hint": "整体约 50 秒（很慢）",
+      "is_default": true,
+      "latency_hint": "整体约 45–85 秒（很慢）",
       "accuracy_hint": "最准，零编造",
-      "note": "最准但很慢：一次请求要跑意图解析和解释生成两趟，线上实测 52 秒。实测 3 个意图 case 全部正确、零编造",
+      "note": "默认，最准但很慢：一次请求跑意图解析和解释生成两趟，线上 3 次实测 43s / 52s / 85s。实测 3 个意图 case 全部正确、零编造。赶时间可切 GLM-4-Flash-250414",
       "measured": {
         "avg_latency_s": 30.1,
         "hallucinated_cases": "0/3",
         "probed_at": "2026-09-18",
-        "e2e_latency_s": 52.2
+        "e2e_latency_s": 60.0
       }
     }
   ],

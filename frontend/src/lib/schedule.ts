@@ -5,11 +5,40 @@ export const SKILL_MANAGER = '店长值守';
 
 /**
  * 把 `/api/import` 的精简格子补成看板 / base_slots 需要的完整 Slot。
- * day_label、shift_time、min_required 一律取自 `/api/meta`，不从导入文件里猜；
- * meta 里不存在的 day/shift 组合直接丢弃，避免脏数据把看板撑歪。
+ *
+ * day_label、shift_time 一律取自当前维度（meta），不从导入文件里猜；
+ * min_required 由调用方给的解析器决定——配置化之后同一天的不同班次可以有不同下限，
+ * 不能再按「天」取一个值。
+ *
+ * 键的匹配是**别名容错**的：导入文件里写的是人话（「周一」「早班」），而维度键是 d1/s1。
+ * 这里按 id / 标签 / 去掉「周」的标签三种写法去认，认不出的格子直接丢弃，
+ * 避免脏数据把看板撑歪。
  */
-export function normalizeImportedSlots(meta: Meta, imported: ImportedSlot[]): Slot[] {
-  const bySlot = new Map(imported.map((s) => [slotKey(s.day, s.shift), s]));
+export function normalizeImportedSlots(
+  meta: Meta,
+  imported: ImportedSlot[],
+  minRequired?: (day: string, shift: string) => number,
+): Slot[] {
+  const dayAlias = new Map<string, string>();
+  for (const d of meta.days) {
+    dayAlias.set(d.key, d.key);
+    dayAlias.set(d.label, d.key);
+    dayAlias.set(d.label.replace(/^周/, ''), d.key);
+  }
+  const shiftAlias = new Map<string, string>();
+  for (const s of meta.shifts) {
+    shiftAlias.set(s.key, s.key);
+    shiftAlias.set(s.label, s.key);
+  }
+
+  const bySlot = new Map<string, ImportedSlot>();
+  for (const s of imported) {
+    const day = dayAlias.get(s.day);
+    const shift = shiftAlias.get(s.shift);
+    if (!day || !shift) continue;
+    bySlot.set(slotKey(day, shift), s);
+  }
+
   const out: Slot[] = [];
   for (const day of meta.days) {
     for (const shift of meta.shifts) {
@@ -20,7 +49,7 @@ export function normalizeImportedSlots(meta: Meta, imported: ImportedSlot[]): Sl
         day_label: day.label,
         shift: shift.key,
         shift_time: shift.time,
-        min_required: day.min_required,
+        min_required: minRequired ? minRequired(day.key, shift.key) : day.min_required,
         employees: [...hit.employees].sort(),
       });
     }
@@ -28,21 +57,13 @@ export function normalizeImportedSlots(meta: Meta, imported: ImportedSlot[]): Sl
   return out;
 }
 
-/** 该班次的候选人员：当日可工作、未请假、未在当天另一班次、且不在本班次内 */
-export function candidatesForSlot(
-  meta: Meta,
-  slots: Slot[],
-  target: Slot,
-  needSkill?: string,
-): string[] {
-  const other = slots.find((s) => s.day === target.day && s.shift !== target.shift);
-  const busy = new Set([...(other?.employees ?? []), ...target.employees]);
-  return meta.employees
-    .filter((e) => !busy.has(e.id))
-    .filter((e) => e.available_days.includes(target.day) && !e.leave_days.includes(target.day))
-    .filter((e) => (needSkill ? e.skills.includes(needSkill) : true))
-    .map((e) => e.id);
-}
+/**
+ * 换人候选的前端实现已删除。
+ *
+ * 候选名单一律走 `POST /api/candidates`（契约 5.5）：过滤条件与求解器共用
+ * `solver.eligible`，前端再留一份「差不多的过滤」只会和后端悄悄漂移——
+ * 而店长正是照着这份名单做决定的。mock 模式下的参考实现见 mock/candidates.ts。
+ */
 
 /** 每位员工本周班次数（用于换人面板提示工时余量） */
 export function weeklyLoad(slots: Slot[]): Map<string, number> {
@@ -102,4 +123,19 @@ export function buildCorrectedInstruction(original: string, chips: IntentChip[])
 
 export function isManager(meta: Meta | null, id: string): boolean {
   return meta?.employees.find((e) => e.id === id)?.skills.includes(SKILL_MANAGER) ?? false;
+}
+
+/**
+ * 违规 / 格子的定位文案。
+ *
+ * 配置化之后 `day`、`shift` 是内部 id（d1 / s1），直接拼进文案会显示成「周d1 s1」。
+ * 所以任何要展示位置的地方都必须过这个翻译，翻译不出来时原样回显 id 便于排查。
+ * 跨格子的规则（如周工时）后端不给 day/shift，此时说「本周期整体」。
+ */
+export function formatScope(meta: Meta, day: string, shift: string): string {
+  const dayLabel = meta.days.find((d) => d.key === day)?.label ?? day;
+  const shiftLabel = meta.shifts.find((s) => s.key === shift)?.label ?? shift;
+  if (day && shift) return `${dayLabel} ${shiftLabel}`;
+  if (day) return `${dayLabel} 全天`;
+  return '本周期整体';
 }
