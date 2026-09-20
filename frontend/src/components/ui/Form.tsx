@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react';
 import { Check, ChevronDown, Minus, Plus } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -200,6 +201,21 @@ export function NumberInput({
   );
 }
 
+/**
+ * 步进器：+/- 微调 + 中间数字可直接输入。
+ *
+ * 一开始只做了 +/- 按钮，想法是「杜绝手输非法值」。线上验收时实测到代价：把每班人数
+ * 下限从 4 调到 20 要点 16 次。小门店（4–6 人/班）无感，大团队直接难以使用，这个取舍
+ * 不成立，于是补上直接输入。
+ *
+ * 关键设计是**输入期间不做任何纠正，只在失焦时校验**：
+ * - 边打边 clamp 会让「把 4 改成 20」这种操作无法完成 —— 删掉 4 的瞬间值变空、
+ *   被 clamp 回 min，再打 2 就成了 2，用户永远打不出 20；
+ * - 所以输入期用一份 draft 字符串托管，允许中途处于空串、超范围等非法中间态；
+ * - 失焦（或回车）才提交：越界按边界收下、非法则整体回退，两种情况都出一句说明，
+ *   绝不悄悄改掉用户填的数 —— 静默纠正比报错更让人困惑。
+ * - Esc 放弃本次编辑，符合输入框的通用预期。
+ */
 export function Stepper({
   value,
   onChange,
@@ -219,30 +235,130 @@ export function Stepper({
 }) {
   const btn =
     'flex h-7 w-7 flex-none items-center justify-center rounded-md border border-line bg-white text-mut transition-colors duration-150 hover:border-teal-300 hover:text-teal-700 disabled:cursor-not-allowed disabled:text-mut-2 disabled:hover:border-line focus-ring';
+
+  // draft 为 null 表示「没在编辑」，显示真值；非 null 时完全交给用户，不插手
+  const [draft, setDraft] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const noteTimer = useRef<number | null>(null);
+
+  const flash = (text: string) => {
+    setNote(text);
+    if (noteTimer.current !== null) window.clearTimeout(noteTimer.current);
+    // 提示只是解释「刚刚发生了什么」，读完即可消失；常驻会和字段级 error 抢注意力
+    noteTimer.current = window.setTimeout(() => setNote(null), 4000);
+  };
+  useEffect(
+    () => () => {
+      if (noteTimer.current !== null) window.clearTimeout(noteTimer.current);
+    },
+    [],
+  );
+
+  const commit = () => {
+    if (draft === null) return;
+    const raw = draft.trim();
+    setDraft(null);
+    if (raw === '') {
+      flash(`不能留空，已恢复为 ${value}`);
+      return;
+    }
+    // 只认整数：这几个场景（人数、天数、班次数）没有小数语义，"2.5 人" 只会带来歧义
+    if (!/^-?\d+$/.test(raw)) {
+      flash(`只能填整数，已恢复为 ${value}`);
+      return;
+    }
+    const n = Number(raw);
+    if (n < min) {
+      flash(`最小是 ${min}，已按 ${min} 处理`);
+      onChange(min);
+      return;
+    }
+    if (n > max) {
+      flash(`最大是 ${max}，已按 ${max} 处理`);
+      onChange(max);
+      return;
+    }
+    if (n !== value) onChange(n);
+  };
+
+  const step = (delta: number) => {
+    // 先落地未提交的输入，避免「打了一半又去点 +」时以旧值为基准跳变
+    const base = draft === null ? value : Number.parseInt(draft.trim(), 10);
+    const from = Number.isFinite(base) ? base : value;
+    setDraft(null);
+    setNote(null);
+    onChange(Math.min(max, Math.max(min, from + delta)));
+  };
+
+  const shown = draft === null ? String(value) : draft;
+  const atMin = draft === null && value <= min;
+  const atMax = draft === null && value >= max;
+
   return (
-    <span className="inline-flex items-center gap-1.5">
-      <button
-        type="button"
-        className={btn}
-        aria-label={`${label ?? ''}减少`}
-        disabled={disabled || value <= min}
-        onClick={() => onChange(Math.max(min, value - 1))}
-      >
-        <Minus size={12} />
-      </button>
-      <b className="min-w-[44px] text-center text-[13px] font-semibold tabular-nums text-ink">
-        {value}
-        {suffix ? <span className="ml-0.5 text-[10.5px] font-normal text-mut">{suffix}</span> : null}
-      </b>
-      <button
-        type="button"
-        className={btn}
-        aria-label={`${label ?? ''}增加`}
-        disabled={disabled || value >= max}
-        onClick={() => onChange(Math.min(max, value + 1))}
-      >
-        <Plus size={12} />
-      </button>
+    <span className="inline-flex flex-col gap-0.5">
+      <span className="inline-flex items-center gap-1.5">
+        <button
+          type="button"
+          className={btn}
+          aria-label={`${label ?? ''}减少`}
+          disabled={disabled || atMin}
+          onClick={() => step(-1)}
+        >
+          <Minus size={12} />
+        </button>
+        <span className="relative inline-flex">
+          <input
+            type="text"
+            inputMode="numeric"
+            aria-label={label}
+            value={shown}
+            disabled={disabled}
+            onChange={(e) => setDraft(e.target.value)}
+            // 聚焦即全选：改数值的主流诉求是「换一个数」，而不是在原数里插字符
+            onFocus={(e) => e.currentTarget.select()}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                e.currentTarget.blur();
+              } else if (e.key === 'Escape') {
+                setDraft(null);
+                setNote(null);
+              } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                step(1);
+              } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                step(-1);
+              }
+            }}
+            className={cn(
+              'h-7 w-[58px] rounded-md border border-line bg-white text-center text-[13px] font-semibold tabular-nums text-ink transition-colors duration-150 focus:outline-none disabled:bg-soft disabled:text-mut focus-ring',
+              suffix ? 'pr-5' : '',
+              note ? 'border-amber-300' : '',
+            )}
+          />
+          {suffix ? (
+            <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[10.5px] font-normal text-mut-2">
+              {suffix}
+            </span>
+          ) : null}
+        </span>
+        <button
+          type="button"
+          className={btn}
+          aria-label={`${label ?? ''}增加`}
+          disabled={disabled || atMax}
+          onClick={() => step(1)}
+        >
+          <Plus size={12} />
+        </button>
+      </span>
+      {note ? (
+        <span role="status" aria-live="polite" className="text-[10.5px] leading-tight text-amber-700">
+          {note}
+        </span>
+      ) : null}
     </span>
   );
 }

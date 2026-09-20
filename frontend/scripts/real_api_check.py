@@ -54,7 +54,9 @@ def main() -> int:
 
         # ---------- 1. 首屏：不强制配置，直接落生成页 ----------
         page.set_default_timeout(60000)
-        page.goto(BASE, wait_until="networkidle", timeout=90000)
+        # 不用 networkidle：页面有后端健康轮询，线上环境永远等不到「网络安静」，
+        # 会在首屏就假失败。改成 DOM ready + 固定缓冲，断言本身仍基于真实响应体。
+        page.goto(BASE, wait_until="domcontentloaded", timeout=90000)
         page.wait_for_timeout(2500)
         body = page.inner_text("body")
         check("首屏落在生成页（不强制先配置）", "排班需求" in body or "生成排班" in body)
@@ -104,17 +106,37 @@ def main() -> int:
         page.screenshot(path=SHOTS / "04_config_step1_real.png", full_page=True)
 
         # 把普通日人数下限顶到上限（20 人档案 + 每人每天最多一个班 → 按天必定不够）。
-        # 人数下限用的是 Stepper（+/- 按钮），没有可直接 fill 的输入框，所以这里只能连点。
-        # 顺带说明一个可用性代价：从 4 调到 20 需要点 16 次，团队规模大的门店会很难受。
+        # Stepper 现在支持直接输入，所以这里一次 fill 到位，同时顺手验掉三条交互约定：
+        # 越界按边界收下、留空回退原值、输入期间不被 clamp 打断。
         page.get_by_role("button", name=re.compile("规则")).first.click()
         page.wait_for_timeout(1200)
-        plus = page.get_by_role("button", name="普通日人数下限增加")
-        if plus.count() > 0:
-            clicks = 0
-            while plus.first.is_enabled() and clicks < 30:
-                plus.first.click()
-                clicks += 1
-            print(f"       （人数下限连点 {clicks} 次才到上限）")
+        # exact=True：+/- 按钮的 aria-label 也含这几个字，非精确匹配会先命中按钮
+        box = page.get_by_label("普通日人数下限", exact=True)
+        if box.count() > 0:
+            box = box.first
+            before = box.input_value()
+
+            # a) 留空失焦 → 回退原值，且给出说明
+            box.fill("")
+            box.blur()
+            page.wait_for_timeout(400)
+            check("Stepper 留空失焦回退原值", box.input_value() == before, f"{before!r} -> {box.input_value()!r}")
+            check("回退时给出说明", "已恢复为" in page.inner_text("body"))
+
+            # b) 直接输入中间值：一次到位，不再需要连点
+            box.fill("12")
+            box.blur()
+            page.wait_for_timeout(600)
+            check("Stepper 可直接输入", box.input_value() == "12", box.input_value())
+
+            # c) 超上限 → 按 max 收下（20 人全启用 → max 20），并说明
+            box.fill("999")
+            box.blur()
+            page.wait_for_timeout(600)
+            clamped = box.input_value()
+            check("Stepper 越界按边界处理", clamped.isdigit() and 0 < int(clamped) < 999, clamped)
+            check("越界时给出说明", "已按" in page.inner_text("body"))
+            print(f"       （直接输入一次到位：{before} -> {clamped}，旧版需连点 {int(clamped) - int(before)} 次）")
             page.wait_for_timeout(3000)
             vc = seen.get("config/validate")
             check("POST /api/config/validate 被调用", bool(vc), str(vc and vc["status"]))
