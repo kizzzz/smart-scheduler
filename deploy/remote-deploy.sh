@@ -71,6 +71,19 @@ env_of() {
 }
 
 FINAL_KEY="$(env_of GLM_API_KEY '' "${GLM_API_KEY:-}")"
+
+# 白名单之外的键也必须带过去。真实服务器上就有 GLM_BASE_URL 这种脚本没预见的配置项，
+# 只保留白名单等于悄悄删掉它——后端会改打默认 endpoint，症状是「部署成功但模型不通」。
+# 宁可原样搬运陌生键，也不要替用户做删除决定。
+KNOWN_KEYS='GLM_API_KEY|GLM_MODEL|GLM_TIMEOUT|GLM_RETRIES|GLM_VISION_TIMEOUT|GLM_EXTRA_MODELS|SITE_ADDRESS|SERVER_IP|ACME_EMAIL|CORS_ORIGINS'
+carry_over_unknown() {
+  grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$REMOTE_ENV_TMP" 2>/dev/null \
+    | grep -vE "^($KNOWN_KEYS)=" || true
+}
+EXTRA_COUNT="$(carry_over_unknown | grep -c '=' || true)"
+if [[ "${EXTRA_COUNT:-0}" -gt 0 ]]; then
+  echo "  另有 $EXTRA_COUNT 个非标准配置项将原样保留：$(carry_over_unknown | cut -d= -f1 | tr '\n' ' ')"
+fi
 if [[ -z "$FINAL_KEY" ]]; then
   echo "  !! 服务端与本次调用都没有 GLM_API_KEY，后端将全程降级为规则解析" >&2
 fi
@@ -89,6 +102,7 @@ SITE_ADDRESS=${FINAL_SITE}
 SERVER_IP=$(env_of SERVER_IP "${TARGET#*@}" "${SERVER_IP:-}")
 ACME_EMAIL=$(env_of ACME_EMAIL '' "${ACME_EMAIL:-}")
 CORS_ORIGINS=$(env_of CORS_ORIGINS '*' "${CORS_ORIGINS:-}")
+$(carry_over_unknown)
 EOF
 rm -f "$REMOTE_ENV_TMP"
 

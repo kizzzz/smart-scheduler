@@ -14,7 +14,10 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright, expect
 
 BASE = os.environ.get("CHECK_BASE", "http://127.0.0.1:5173")
-SHOTS = Path("/tmp/real_api_shots")
+# 线上默认模型是 glm-4.5-flash，实测一次生成 45–140 秒（两趟 LLM）；本地无 Key 时走规则
+# 解析只要几秒。所以等待预算必须可调，写死任何一个值都会让另一种环境误报失败。
+GEN_WAIT_MS = int(os.environ.get("GEN_WAIT_MS", "6000"))
+SHOTS = Path(os.environ.get("SHOTS_DIR", "/tmp/real_api_shots"))
 SHOTS.mkdir(parents=True, exist_ok=True)
 
 failures: list[str] = []
@@ -50,8 +53,9 @@ def main() -> int:
         page.on("response", on_response)
 
         # ---------- 1. 首屏：不强制配置，直接落生成页 ----------
-        page.goto(BASE, wait_until="networkidle")
-        page.wait_for_timeout(1500)
+        page.set_default_timeout(60000)
+        page.goto(BASE, wait_until="networkidle", timeout=90000)
+        page.wait_for_timeout(2500)
         body = page.inner_text("body")
         check("首屏落在生成页（不强制先配置）", "排班需求" in body or "生成排班" in body)
         check("首屏提示当前用示例配置", "示例" in body, body[:120].replace("\n", " "))
@@ -66,7 +70,7 @@ def main() -> int:
         # ---------- 2. 真接口生成（无 LLM key，走规则解析降级） ----------
         page.fill("textarea", "正常排一版")
         page.get_by_role("button", name=re.compile("生成排班|重新生成")).first.click()
-        page.wait_for_timeout(6000)
+        page.wait_for_timeout(GEN_WAIT_MS)
         gen = seen.get("generate")
         check("POST /api/generate 200", bool(gen) and gen["status"] == 200, str(gen and gen["status"]))
         if gen and gen["body"]:
