@@ -1,0 +1,28 @@
+# FlagForge 站点 —— flagforge.typexx.work
+#
+# 由主 Caddyfile 的 `import conf.d/*.caddy` 加载。
+# /api/* 反代 /opt/flagforge compose 栈的 backend（edge 网络别名 flagforge），
+# 其余流量给前端静态容器（别名 flagforge-web，内部已做 SPA fallback）。
+flagforge.typexx.work {
+	encode gzip zstd
+
+	handle /api/* {
+		reverse_proxy flagforge:8787
+	}
+
+	handle {
+		reverse_proxy flagforge-web:80
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options SAMEORIGIN
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

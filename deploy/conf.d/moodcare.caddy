@@ -1,0 +1,25 @@
+# 心晴 moodcare 站点 —— 与 smart-scheduler/citewise 共用 80/443
+# 由主 Caddyfile 的 import conf.d/*.caddy 加载，反代目标 moodcare:8000 是
+# /opt/moodcare compose 栈的服务别名（同在 smart-scheduler_scheduler 网络）。
+meituan.typexx.work {
+	encode gzip zstd
+
+	reverse_proxy moodcare:8000 {
+		transport http {
+			# LLM 回应最坏 ~60s，给足余量
+			read_timeout 120s
+		}
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options SAMEORIGIN
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

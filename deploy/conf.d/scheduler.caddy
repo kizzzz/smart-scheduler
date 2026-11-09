@@ -1,0 +1,47 @@
+# 智能排班助手站点 —— scheduler.typexx.work
+#
+# 由主 Caddyfile 的 `import conf.d/*.caddy` 加载。
+# 静态前端伺服复用 web 容器内的 /srv（与 IP 直连入口同一份产物），
+# /api 反代 compose 栈内的 api 服务（smart-scheduler_scheduler 网络）。
+# 超时/健康检查参数与主 Caddyfile 的 app snippet 保持一致：
+# 一次 /api/generate 两趟 LLM 最坏约 150s，read_timeout 给 180s。
+scheduler.typexx.work {
+	encode gzip zstd
+
+	handle /api/* {
+		reverse_proxy api:8000 {
+			health_uri /api/health
+			health_interval 5s
+			health_timeout 3s
+			lb_try_duration 5s
+			lb_try_interval 250ms
+
+			transport http {
+				read_timeout 180s
+			}
+		}
+	}
+
+	handle {
+		root * /srv
+
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		header /index.html Cache-Control "no-cache"
+
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options SAMEORIGIN
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
